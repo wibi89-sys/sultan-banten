@@ -1,0 +1,16 @@
+# Prevent directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to includes via a separate .htaccess if needed, 
+# but for now we'll just ensure sensitive files are protected.
+
+# Allow access to index and main files
+<FilesMatch "^(index|dashboard|penghuni|overstaying|integrasi|kroscek|laporan|upt|users|instansi|pengumuman|profile|activity-log|wa-settings|wa-schedule|wa-pimpinan|cron-wa|logout)\.php$">
+    Allow from all
+</FilesMatch>
