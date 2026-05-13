@@ -1623,7 +1623,14 @@ function getOverkapasitasColor($persen) {
 
         <!-- Peta Lokasi UPT -->
         <div class="chart-card">
-            <h5 class="mb-3"><i class="fas fa-map-marked-alt me-2"></i>Peta Lokasi UPT di Banten</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i>Peta Lokasi UPT di Banten</h5>
+                <div class="btn-group btn-group-sm mt-2 mt-sm-0" role="group">
+                    <button type="button" class="btn btn-outline-primary" id="btnStreet">Street</button>
+                    <button type="button" class="btn btn-outline-primary" id="btnSatellite">Satellite</button>
+                    <button type="button" class="btn btn-outline-primary active" id="btnHybrid">Hybrid</button>
+                </div>
+            </div>
             <div id="mapBanten" style="height: 400px; width: 100%; border-radius: 8px; z-index: 1;"></div>
             <div class="mt-2 text-muted small">
                 <i class="fas fa-info-circle"></i> Klik marker untuk melihat detail UPT
@@ -2479,13 +2486,57 @@ function getOverkapasitasColor($persen) {
             </table>
         `;
 
-        // Initialize Map - Peta Banten
-        const mapBanten = L.map('mapBanten').setView([-6.4409, 106.1385], 9);
-
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Define Map Layers
+        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(mapBanten);
+        });
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        const hybridLayer = L.layerGroup([
+            satelliteLayer,
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Labels &copy; Esri'
+            })
+        ]);
+
+        // Initialize Map - Peta Banten with Hybrid as default
+        const mapBanten = L.map('mapBanten', {
+            layers: [hybridLayer]
+        }).setView([-6.4409, 106.1385], 9);
+
+        // Map Mode Switcher Logic
+        const btnStreet = document.getElementById('btnStreet');
+        const btnSatellite = document.getElementById('btnSatellite');
+        const btnHybrid = document.getElementById('btnHybrid');
+
+        function updateActiveMapBtn(activeBtn) {
+            [btnStreet, btnSatellite, btnHybrid].forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+        }
+
+        btnStreet.addEventListener('click', function() {
+            mapBanten.removeLayer(satelliteLayer);
+            mapBanten.removeLayer(hybridLayer);
+            streetLayer.addTo(mapBanten);
+            updateActiveMapBtn(this);
+        });
+
+        btnSatellite.addEventListener('click', function() {
+            mapBanten.removeLayer(streetLayer);
+            mapBanten.removeLayer(hybridLayer);
+            satelliteLayer.addTo(mapBanten);
+            updateActiveMapBtn(this);
+        });
+
+        btnHybrid.addEventListener('click', function() {
+            mapBanten.removeLayer(streetLayer);
+            mapBanten.removeLayer(satelliteLayer);
+            hybridLayer.addTo(mapBanten);
+            updateActiveMapBtn(this);
+        });
 
         // Banten Province Boundary (simplified GeoJSON)
         const bantenBoundary = {
