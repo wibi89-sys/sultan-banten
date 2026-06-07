@@ -9,7 +9,7 @@ date_default_timezone_set('Asia/Jakarta');
 
 // Database credentials
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'sistem-upt');
+define('DB_NAME', 'kanwil_banten');
 define('DB_USER', 'root');
 define('DB_PASS', ''); // Kosongkan jika tidak ada password di XAMPP
 
