@@ -42,7 +42,7 @@ $filterUpt = isset($_GET['upt_id']) ? (int)$_GET['upt_id'] : 0;
 $klasifikasiUmum = ['Pidana Umum'];
 $klasifikasiKhusus = ['Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida'];
 $klasifikasiUUITE = ['UU ITE'];
-$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
 $klasifikasiUtama = array_merge($klasifikasiUmum, $klasifikasiKhusus, $klasifikasiUUITE);
 $allKlasifikasi = array_merge($klasifikasiUtama, $klasifikasiLainnya);
 

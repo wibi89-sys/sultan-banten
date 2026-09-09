@@ -19,7 +19,7 @@ $sql = "SELECT
             u.nama_upt,
             (SELECT SUM(tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan) 
              FROM data_penghuni dp 
-             WHERE dp.upt_id = u.id AND dp.tanggal = :tanggal1 AND dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun')) as jml_penghuni,
+             WHERE dp.upt_id = u.id AND dp.tanggal = :tanggal1 AND dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup')) as jml_penghuni,
             (SELECT SUM(tahanan_ai + tahanan_aii + tahanan_aiii + tahanan_aiv + tahanan_av) 
              FROM data_overstaying do 
              WHERE do.upt_id = u.id AND do.tanggal = :tanggal2) as jml_overstaying

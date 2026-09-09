@@ -379,7 +379,7 @@ $hariOptions = [
                         'Jenis Kelamin' => ['laki_laki', 'perempuan'],
                         'Jenis Pidana - Kelompok' => ['pidum_ite', 'pidsus'],
                         'Jenis Pidana - Detail' => ['tipikor', 'narkoba_bandar', 'narkoba_pengguna', 'teroris', 'ilegal_logging', 'trafficking', 'money_laundering', 'genosida'],
-                        'Kategori Lainnya' => ['wna', 'lansia', 'sakit', 'uu_ite'],
+                        'Kategori Lainnya' => ['wna', 'lansia', 'sakit', 'uu_ite', 'pidana_mati', 'seumur_hidup'],
                         'Overstaying' => ['overstaying_ai', 'overstaying_aii', 'overstaying_aiii', 'overstaying_aiv', 'overstaying_av', 'total_overstaying'],
                         'Integrasi' => ['sk_pb', 'sk_cb', 'sk_cmb', 'sk_asimilasi', 'total_sk'],
                     ];

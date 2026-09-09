@@ -29,7 +29,7 @@ if ($filter_upt > 0) {
 $klasifikasiPidum = ['Pidana Umum'];
 $klasifikasiPidsus = ['Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida'];
 $klasifikasiUUITE = ['UU ITE'];
-$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
 $klasifikasiUtama = array_merge($klasifikasiPidum, $klasifikasiPidsus, $klasifikasiUUITE);
 
 // Get statistics with filters
@@ -220,11 +220,11 @@ if ($overstayingData) {
 // Get data per UPT for overkapasitas table (exclude Lainnya)
 $uptDataQuery = "SELECT 
     u.id, u.nama_upt, u.kapasitas,
-    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun') 
+    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup') 
         THEN dp.tahanan_dewasa_laki + dp.tahanan_dewasa_perempuan + dp.tahanan_anak_laki + dp.tahanan_anak_perempuan ELSE 0 END), 0) as total_tahanan,
-    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun') 
+    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup') 
         THEN dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan ELSE 0 END), 0) as total_narapidana,
-    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun') 
+    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup') 
         THEN dp.tahanan_dewasa_laki + dp.tahanan_dewasa_perempuan + dp.tahanan_anak_laki + dp.tahanan_anak_perempuan + 
         dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan ELSE 0 END), 0) as total_penghuni
     FROM upt u
@@ -248,7 +248,7 @@ $stmt = $pdo->prepare("SELECT
     SUM(tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan + 
         narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan) as total
     FROM data_penghuni 
-    WHERE klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun') " . str_replace('WHERE', 'AND', $whereClause) . "
+    WHERE klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup') " . str_replace('WHERE', 'AND', $whereClause) . "
     GROUP BY klasifikasi_pidana
     ORDER BY total DESC");
 $stmt->execute($params);
@@ -260,7 +260,7 @@ $stmt = $pdo->prepare("SELECT
         d.narapidana_dewasa_laki + d.narapidana_dewasa_perempuan + d.narapidana_anak_laki + d.narapidana_anak_perempuan) as total
     FROM data_penghuni d
     JOIN upt u ON d.upt_id = u.id
-    WHERE d.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun') " . str_replace('WHERE', 'AND', $whereClause) . "
+    WHERE d.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup') " . str_replace('WHERE', 'AND', $whereClause) . "
     GROUP BY u.id, u.nama_upt
     ORDER BY total DESC");
 $stmt->execute($params);
@@ -272,7 +272,7 @@ $uptLocationsQuery = "SELECT
     COALESCE(SUM(dp.tahanan_dewasa_laki + dp.tahanan_dewasa_perempuan + dp.tahanan_anak_laki + dp.tahanan_anak_perempuan + 
         dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan), 0) as total_penghuni
     FROM upt u
-    LEFT JOIN data_penghuni dp ON u.id = dp.upt_id AND dp.tanggal = ? AND dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun')
+    LEFT JOIN data_penghuni dp ON u.id = dp.upt_id AND dp.tanggal = ? AND dp.klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup')
     WHERE u.latitude IS NOT NULL AND u.longitude IS NOT NULL
     " . ($filter_upt > 0 ? " AND u.id = ?" : "") . "
     GROUP BY u.id, u.nama_upt, u.alamat, u.kapasitas, u.latitude, u.longitude";
@@ -343,7 +343,7 @@ $umurGenderQuery = "SELECT
     SUM(tahanan_anak_laki + narapidana_anak_laki) as anak_laki,
     SUM(tahanan_anak_perempuan + narapidana_anak_perempuan) as anak_perempuan
     FROM data_penghuni
-    WHERE klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun') " . str_replace('WHERE', 'AND', $whereClause);
+    WHERE klasifikasi_pidana NOT IN ('WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup') " . str_replace('WHERE', 'AND', $whereClause);
 $stmtUmurGender = $pdo->prepare($umurGenderQuery);
 $stmtUmurGender->execute($params);
 $umurGenderData = $stmtUmurGender->fetch();

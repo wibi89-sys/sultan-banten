@@ -107,7 +107,7 @@ function initDatabase($pdo) {
     $pdo->exec("CREATE TABLE IF NOT EXISTS data_penghuni (
         id INT AUTO_INCREMENT PRIMARY KEY,
         upt_id INT NOT NULL,
-        klasifikasi_pidana ENUM('Pidana Umum', 'Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida', 'WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'UU ITE') NOT NULL,
+        klasifikasi_pidana ENUM('Pidana Umum', 'Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida', 'WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup', 'UU ITE') NOT NULL,
         tahanan_dewasa_laki INT DEFAULT 0,
         tahanan_dewasa_perempuan INT DEFAULT 0,
         tahanan_anak_laki INT DEFAULT 0,
@@ -246,7 +246,7 @@ function initDatabase($pdo) {
             $pdo->exec("CREATE TABLE data_penghuni (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 upt_id INT NOT NULL,
-                klasifikasi_pidana ENUM('Pidana Umum', 'Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida', 'WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'UU ITE') NOT NULL,
+                klasifikasi_pidana ENUM('Pidana Umum', 'Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida', 'WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup', 'UU ITE') NOT NULL,
                 tahanan_dewasa_laki INT DEFAULT 0,
                 tahanan_dewasa_perempuan INT DEFAULT 0,
                 tahanan_anak_laki INT DEFAULT 0,

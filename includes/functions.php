@@ -6,7 +6,7 @@
 require_once __DIR__ . '/database.php';
 
 // Klasifikasi Lainnya yang tidak termasuk perhitungan statistik
-$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
 
 /**
  * Start session if not already started
@@ -274,7 +274,7 @@ function getDashboardStats() {
     $uptFilter = getUserUptFilter();
     
     // Klasifikasi yang TIDAK termasuk perhitungan (Lainnya)
-    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
     $excludePlaceholders = implode(',', array_fill(0, count($excludeKlasifikasi), '?'));
     
     // Total UPT
@@ -379,7 +379,7 @@ function getPenghuniByKlasifikasi($uptClause = "", $params = []) {
     global $pdo;
     
     // Klasifikasi yang TIDAK termasuk perhitungan (Lainnya)
-    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
     $excludePlaceholders = implode(',', array_fill(0, count($excludeKlasifikasi), '?'));
     
     $whereClause = "WHERE klasifikasi_pidana NOT IN ($excludePlaceholders)";
@@ -413,7 +413,7 @@ function getPenghuniByUPT($uptClause = "", $params = []) {
     global $pdo;
     
     // Klasifikasi yang TIDAK termasuk perhitungan (Lainnya)
-    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
     $excludePlaceholders = implode(',', array_fill(0, count($excludeKlasifikasi), '?'));
     
     $whereClause = "WHERE d.klasifikasi_pidana NOT IN ($excludePlaceholders)";
@@ -448,7 +448,7 @@ function getUptDataTable($dateClause = "", $params = [], $uptFilter = null) {
     global $pdo;
     
     // Klasifikasi yang TIDAK termasuk perhitungan (Lainnya)
-    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+    $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
     $excludePlaceholders = implode(',', array_fill(0, count($excludeKlasifikasi), '?'));
     
     $whereClause = "dp.klasifikasi_pidana NOT IN ($excludePlaceholders)";
@@ -1216,7 +1216,7 @@ function generateComprehensiveReport($tanggal = null, $upt_id = null) {
     $klasifikasiPidum = ['Pidana Umum'];
     $klasifikasiPidsus = ['Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida'];
     $klasifikasiUUITE = ['UU ITE'];
-    $klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+    $klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
     
     // 1. Get UPT count
     $sql = "SELECT COUNT(DISTINCT upt_id) as total FROM (
@@ -1340,7 +1340,7 @@ function generateComprehensiveReport($tanggal = null, $upt_id = null) {
     }
     
     // Kategori Lainnya (WNA, Lansia, Sakit, UU ITE)
-    $lainnyaArr = ['WNA' => 'wna', 'Lansia >70 tahun' => 'lansia', 'Sakit Berkepanjangan' => 'sakit', 'UU ITE' => 'uu_ite'];
+    $lainnyaArr = ['WNA' => 'wna', 'Lansia >70 tahun' => 'lansia', 'Sakit Berkepanjangan' => 'sakit', 'UU ITE' => 'uu_ite', 'Pidana Mati' => 'pidana_mati', 'Seumur Hidup' => 'seumur_hidup'];
     foreach ($lainnyaArr as $dbVal => $repKey) {
         $sql = "SELECT SUM(tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan + 
             narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan) as total 

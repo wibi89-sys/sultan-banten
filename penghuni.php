@@ -22,7 +22,7 @@ $timeRestrictionMessage = $timeCheck['message'];
 $klasifikasiUmum = ['Pidana Umum'];
 $klasifikasiKhusus = ['Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida'];
 $klasifikasiUUITE = ['UU ITE'];
-$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun'];
+$klasifikasiLainnya = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
 
 // All klasifikasi for calculations (exclude Lainnya)
 $klasifikasiUtama = array_merge($klasifikasiUmum, $klasifikasiKhusus, $klasifikasiUUITE);
