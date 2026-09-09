@@ -119,6 +119,8 @@ $stats['total_uu_ite'] = getKlasifikasiTotal($pdo, $klasifikasiUUITE, $whereClau
 $stats['total_wna'] = getKlasifikasiTotal($pdo, ['WNA'], $whereClause, $params);
 $stats['total_sakit'] = getKlasifikasiTotal($pdo, ['Sakit Berkepanjangan'], $whereClause, $params);
 $stats['total_lansia'] = getKlasifikasiTotal($pdo, ['Lansia >70 tahun'], $whereClause, $params);
+$stats['total_pidana_mati'] = getKlasifikasiTotal($pdo, ['Pidana Mati'], $whereClause, $params);
+$stats['total_seumur_hidup'] = getKlasifikasiTotal($pdo, ['Seumur Hidup'], $whereClause, $params);
 
 // Get penghuni stats (exclude Lainnya from main calculation)
 $excludeKlasifikasi = $klasifikasiLainnya;
@@ -1615,6 +1617,28 @@ function getOverkapasitasColor($persen) {
                         <div class="flex-grow-1">
                             <div class="stat-value-sm text-lainnya"><?= number_format($stats['total_lansia'], 0, ',', '.') ?></div>
                             <p class="stat-label-sm">Total Lansia >70 Tahun</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="stat-card stat-card-sm lainnya h-100">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-danger me-2"><i class="fas fa-skull-crossbones"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm text-lainnya"><?= number_format($stats['total_pidana_mati'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">Total Pidana Mati</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="stat-card stat-card-sm lainnya h-100">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-danger me-2"><i class="fas fa-infinity"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm text-lainnya"><?= number_format($stats['total_seumur_hidup'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">Total Seumur Hidup</p>
                         </div>
                     </div>
                 </div>
