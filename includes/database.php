@@ -334,6 +334,15 @@ function initDatabase($pdo) {
         // Table doesn't exist yet, ignore
     }
     
+    // Update ENUM for klasifikasi_pidana to include Pidana Mati and Seumur Hidup
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM data_penghuni LIKE 'klasifikasi_pidana'");
+        $row = $stmt->fetch();
+        if ($row && strpos($row['Type'], 'Pidana Mati') === false) {
+            $pdo->exec("ALTER TABLE data_penghuni MODIFY COLUMN klasifikasi_pidana ENUM('Pidana Umum', 'Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida', 'WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup', 'UU ITE') NOT NULL");
+        }
+    } catch (Exception $e) {}
+    
     // Add foto column to users table if not exists
     try {
         $stmt = $pdo->query("SHOW COLUMNS FROM users LIKE 'foto'");
