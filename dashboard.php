@@ -1760,7 +1760,7 @@ function getOverkapasitasColor($persen) {
                             <th class="text-center py-1 bg-primary bg-opacity-10" style="width: 40px;">Pidum</th>
                             <th colspan="9" class="text-center py-1 bg-info bg-opacity-25" style="font-size: 9px;">Pidsus</th>
                             <th class="text-center py-1 bg-primary bg-opacity-10" style="width: 40px;">ITE</th>
-                            <th colspan="3" class="text-center py-1 bg-warning bg-opacity-25" style="font-size: 9px;">Lainnya</th>
+                            <th colspan="5" class="text-center py-1 bg-warning bg-opacity-25" style="font-size: 9px;">Lainnya</th>
                         </tr>
                         <tr>
                             <th class="text-center py-1 bg-primary bg-opacity-10" style="width: 40px; font-size: 9px;">Jml</th>
@@ -1777,6 +1777,8 @@ function getOverkapasitasColor($persen) {
                             <th class="text-center py-1 bg-warning bg-opacity-25" style="width: 38px; font-size: 9px;">WNA</th>
                             <th class="text-center py-1 bg-warning bg-opacity-25" style="width: 38px; font-size: 9px;">Sakit</th>
                             <th class="text-center py-1 bg-warning bg-opacity-25" style="width: 38px; font-size: 9px;">Lansia</th>
+                            <th class="text-center py-1 bg-warning bg-opacity-25" style="width: 38px; font-size: 9px;">MT</th>
+                            <th class="text-center py-1 bg-warning bg-opacity-25" style="width: 38px; font-size: 9px;">SH</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1787,7 +1789,7 @@ function getOverkapasitasColor($persen) {
                         $totalTeroris = 0; $totalTrafficking = 0; $totalIlegalLogging = 0;
                         $totalMoneyLaundering = 0; $totalGenosida = 0; $totalPidsus = 0;
                         $totalUUITE = 0;
-                        $totalWNA = 0; $totalSakit = 0; $totalLansia = 0;
+                        $totalWNA = 0; $totalSakit = 0; $totalLansia = 0; $totalPidanaMati = 0; $totalSeumurHidup = 0;
                         $grandTotalPenghuni = 0;
                         
                         foreach ($jenisKejahatanData as $row): 
@@ -1801,7 +1803,13 @@ function getOverkapasitasColor($persen) {
                                     narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan ELSE 0 END), 0) as sakit,
                                 COALESCE(SUM(CASE WHEN klasifikasi_pidana = 'Lansia >70 tahun' 
                                     THEN tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan + 
-                                    narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan ELSE 0 END), 0) as lansia
+                                    narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan ELSE 0 END), 0) as lansia,
+                                COALESCE(SUM(CASE WHEN klasifikasi_pidana = 'Pidana Mati' 
+                                    THEN tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan + 
+                                    narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan ELSE 0 END), 0) as pidana_mati,
+                                COALESCE(SUM(CASE WHEN klasifikasi_pidana = 'Seumur Hidup' 
+                                    THEN tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan + 
+                                    narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan ELSE 0 END), 0) as seumur_hidup
                                 FROM data_penghuni WHERE upt_id = ? AND tanggal = ?");
                             $stmtDetail->execute([$row['id'], $filter_tanggal]);
                             $detail = $stmtDetail->fetch();
@@ -1809,6 +1817,8 @@ function getOverkapasitasColor($persen) {
                             $wna = (int)($detail['wna'] ?? 0);
                             $sakit = (int)($detail['sakit'] ?? 0);
                             $lansia = (int)($detail['lansia'] ?? 0);
+                            $pidana_mati = (int)($detail['pidana_mati'] ?? 0);
+                            $seumur_hidup = (int)($detail['seumur_hidup'] ?? 0);
                             
                             // Calculate Pidsus total
                             $pidsusTotal = (int)$row['tipikor'] + (int)$row['narkoba_bandar'] + (int)$row['narkoba_pengguna'] + 
@@ -1829,6 +1839,8 @@ function getOverkapasitasColor($persen) {
                             $totalWNA += $wna;
                             $totalSakit += $sakit;
                             $totalLansia += $lansia;
+                            $totalPidanaMati += $pidana_mati;
+                            $totalSeumurHidup += $seumur_hidup;
                             $grandTotalPenghuni += (int)$row['total_penghuni'];
                             
                             $statistikTotalRow = (int)$row['pidum'] + $pidsusTotal + (int)$row['uu_ite'];
@@ -1853,6 +1865,8 @@ function getOverkapasitasColor($persen) {
                             <td class="text-center py-1 text-warning-emphasis align-middle"><?= number_format($wna) ?></td>
                             <td class="text-center py-1 text-warning-emphasis align-middle"><?= number_format($sakit) ?></td>
                             <td class="text-center py-1 text-warning-emphasis align-middle"><?= number_format($lansia) ?></td>
+                            <td class="text-center py-1 text-warning-emphasis align-middle"><?= number_format($pidana_mati) ?></td>
+                            <td class="text-center py-1 text-warning-emphasis align-middle"><?= number_format($seumur_hidup) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -1888,6 +1902,12 @@ function getOverkapasitasColor($persen) {
                             </td>
                             <td class="text-center py-1 text-warning-emphasis align-middle">
                                 <?= number_format($totalLansia) ?>
+                            </td>
+                            <td class="text-center py-1 text-warning-emphasis align-middle">
+                                <?= number_format($totalPidanaMati) ?>
+                            </td>
+                            <td class="text-center py-1 text-warning-emphasis align-middle">
+                                <?= number_format($totalSeumurHidup) ?>
                             </td>
                         </tr>
                     </tfoot>
