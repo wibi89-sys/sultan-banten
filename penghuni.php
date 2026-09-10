@@ -42,7 +42,9 @@ $klasifikasiKeys = [
     'UU ITE' => 'uu_ite',
     'WNA' => 'wna',
     'Sakit Berkepanjangan' => 'sakit_berkepanjangan',
-    'Lansia >70 tahun' => 'lansia_70_tahun'
+    'Lansia >70 tahun' => 'lansia_70_tahun',
+    'Pidana Mati' => 'pidana_mati',
+    'Seumur Hidup' => 'seumur_hidup'
 ];
 
 // Handle Save All Data
@@ -566,6 +568,8 @@ $dataPenghuni = $stmt->fetchAll();
                 <a href="?tab=<?= urlencode($k) ?>" class="filter-tab <?= $selectedKlasifikasi === $k ? 'active' : '' ?>"><?= $k ?></a>
                 <?php endforeach; ?>
                 <a href="?tab=UU+ITE" class="filter-tab <?= $selectedKlasifikasi === 'UU ITE' ? 'active' : '' ?>">UU ITE</a>
+                <a href="?tab=Pidana+Mati" class="filter-tab <?= $selectedKlasifikasi === 'Pidana Mati' ? 'active' : '' ?>">Pidana Mati</a>
+                <a href="?tab=Seumur+Hidup" class="filter-tab <?= $selectedKlasifikasi === 'Seumur Hidup' ? 'active' : '' ?>">Seumur Hidup</a>
                 <a href="?tab=lainnya" class="filter-tab lainnya-tab <?= $selectedKlasifikasi === 'lainnya' ? 'active' : '' ?>">
                     <i class="fas fa-ellipsis-h me-1"></i>Lainnya
                 </a>
