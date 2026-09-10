@@ -570,6 +570,9 @@ $dataPenghuni = $stmt->fetchAll();
                 <a href="?tab=UU+ITE" class="filter-tab <?= $selectedKlasifikasi === 'UU ITE' ? 'active' : '' ?>">UU ITE</a>
                 <a href="?tab=Pidana+Mati" class="filter-tab <?= $selectedKlasifikasi === 'Pidana Mati' ? 'active' : '' ?>">Pidana Mati</a>
                 <a href="?tab=Seumur+Hidup" class="filter-tab <?= $selectedKlasifikasi === 'Seumur Hidup' ? 'active' : '' ?>">Seumur Hidup</a>
+                <a href="?tab=Lansia+%3E70+tahun" class="filter-tab <?= $selectedKlasifikasi === 'Lansia >70 tahun' ? 'active' : '' ?>">Lansia</a>
+                <a href="?tab=Sakit+Berkepanjangan" class="filter-tab <?= $selectedKlasifikasi === 'Sakit Berkepanjangan' ? 'active' : '' ?>">Sakit</a>
+                <a href="?tab=WNA" class="filter-tab <?= $selectedKlasifikasi === 'WNA' ? 'active' : '' ?>">WNA</a>
                 <a href="?tab=lainnya" class="filter-tab lainnya-tab <?= $selectedKlasifikasi === 'lainnya' ? 'active' : '' ?>">
                     <i class="fas fa-ellipsis-h me-1"></i>Lainnya
                 </a>
