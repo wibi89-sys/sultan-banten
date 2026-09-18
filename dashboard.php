@@ -1624,25 +1624,25 @@ function getOverkapasitasColor($persen) {
         </div>
 
         <!-- Pidana Mati dan Seumur Hidup Cards -->
-        <div class="section-header lainnya"><i class="fas fa-skull-crossbones me-1"></i>Pidana Mati dan Seumur Hidup</div>
+        <div class="section-header text-danger" style="border-bottom: 2px solid #dc3545;"><i class="fas fa-skull-crossbones me-1"></i>Pidana Mati dan Seumur Hidup</div>
         <div class="row mb-3 g-2">
             <div class="col-6 col-md-6">
-                <div class="stat-card stat-card-sm lainnya h-100">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #dc3545;">
                     <div class="d-flex align-items-center">
-                        <div class="stat-icon-sm bg-danger me-2"><i class="fas fa-skull-crossbones"></i></div>
+                        <div class="stat-icon-sm bg-danger text-white me-2"><i class="fas fa-skull-crossbones"></i></div>
                         <div class="flex-grow-1">
-                            <div class="stat-value-sm text-lainnya"><?= number_format($stats['total_pidana_mati'], 0, ',', '.') ?></div>
+                            <div class="stat-value-sm text-danger"><?= number_format($stats['total_pidana_mati'], 0, ',', '.') ?></div>
                             <p class="stat-label-sm">Total Pidana Mati</p>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-6">
-                <div class="stat-card stat-card-sm lainnya h-100">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #dc3545;">
                     <div class="d-flex align-items-center">
-                        <div class="stat-icon-sm bg-danger me-2"><i class="fas fa-infinity"></i></div>
+                        <div class="stat-icon-sm bg-danger text-white me-2"><i class="fas fa-infinity"></i></div>
                         <div class="flex-grow-1">
-                            <div class="stat-value-sm text-lainnya"><?= number_format($stats['total_seumur_hidup'], 0, ',', '.') ?></div>
+                            <div class="stat-value-sm text-danger"><?= number_format($stats['total_seumur_hidup'], 0, ',', '.') ?></div>
                             <p class="stat-label-sm">Total Seumur Hidup</p>
                         </div>
                     </div>
