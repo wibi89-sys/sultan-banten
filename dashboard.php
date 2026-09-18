@@ -1621,7 +1621,12 @@ function getOverkapasitasColor($persen) {
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-4">
+        </div>
+
+        <!-- Pidana Mati dan Seumur Hidup Cards -->
+        <div class="section-header lainnya"><i class="fas fa-skull-crossbones me-1"></i>Pidana Mati dan Seumur Hidup</div>
+        <div class="row mb-3 g-2">
+            <div class="col-6 col-md-6">
                 <div class="stat-card stat-card-sm lainnya h-100">
                     <div class="d-flex align-items-center">
                         <div class="stat-icon-sm bg-danger me-2"><i class="fas fa-skull-crossbones"></i></div>
@@ -1632,7 +1637,7 @@ function getOverkapasitasColor($persen) {
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-4">
+            <div class="col-6 col-md-6">
                 <div class="stat-card stat-card-sm lainnya h-100">
                     <div class="d-flex align-items-center">
                         <div class="stat-icon-sm bg-danger me-2"><i class="fas fa-infinity"></i></div>
