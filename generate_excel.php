@@ -57,13 +57,36 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
     try {
         switch ($type) {
             case 'penghuni':
-                $sql = "SELECT dp.*, u.nama_upt FROM data_penghuni dp 
-                        JOIN upt u ON dp.upt_id = u.id 
-                        WHERE 1=1 $uptClause $dateClause 
-                        ORDER BY u.nama_upt, dp.tanggal";
-                $params = [];
-                if ($uptId) $params[] = $uptId;
-                $params = array_merge($params, $dateParams);
+                // Custom query for per-date report exactly like PDF
+                $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
+                $excludePlaceholders = implode(',', array_fill(0, count($excludeKlasifikasi), '?'));
+                
+                $whereClause = "dp.klasifikasi_pidana NOT IN ($excludePlaceholders)";
+                $params = $excludeKlasifikasi;
+                
+                if ($uptId) {
+                    $whereClause .= " AND u.id = ?";
+                    $params[] = $uptId;
+                }
+                
+                if (!empty($dateClause)) {
+                    $cleanDateClause = preg_replace('/^AND\s+/', '', trim($dateClause));
+                    $whereClause .= " AND " . $cleanDateClause;
+                    $params = array_merge($params, $dateParams);
+                }
+                
+                $sql = "SELECT 
+                    u.id, u.nama_upt, u.kapasitas, dp.tanggal, MAX(dp.created_at) as waktu_input,
+                    COALESCE(SUM(dp.tahanan_dewasa_laki + dp.tahanan_dewasa_perempuan + dp.tahanan_anak_laki + dp.tahanan_anak_perempuan), 0) as total_tahanan,
+                    COALESCE(SUM(dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan), 0) as total_narapidana,
+                    COALESCE(SUM(dp.tahanan_dewasa_laki + dp.tahanan_dewasa_perempuan + dp.tahanan_anak_laki + dp.tahanan_anak_perempuan + 
+                        dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan), 0) as total_penghuni
+                    FROM upt u
+                    JOIN data_penghuni dp ON u.id = dp.upt_id
+                    WHERE $whereClause
+                    GROUP BY u.id, u.nama_upt, u.kapasitas, dp.tanggal
+                    ORDER BY u.nama_upt, dp.tanggal";
+                
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 $data = $stmt->fetchAll();
@@ -97,7 +120,7 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
                 
             case 'rekapitulasi':
                 $dateClauseRekap = str_replace("tanggal", "tanggal", $dateClause);
-                // Optimized Rekapitulasi query using subqueries to avoid Cartesian product multiplications
+                // Optimized Rekapitulasi query using subqueries
                 $sql = "SELECT 
                         u.nama_upt, u.kapasitas,
                         (SELECT COALESCE(SUM(tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan), 0) 
@@ -126,7 +149,6 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
                 break;
         }
     } catch (Exception $e) {
-        // Log error if needed: error_log($e->getMessage());
         $data = [];
     }
     
@@ -162,130 +184,134 @@ echo '<head><meta charset="UTF-8"></head>';
 echo '<body>';
 echo '<table border="1">';
 
-// Header info
-$namaInstansi = $instansi['nama_instansi'] ?? 'KEMENTERIAN HUKUM DAN HAK ASASI MANUSIA';
-$alamat = $instansi['alamat'] ?? '';
-
-echo '<tr><td colspan="20" align="center"><b>' . htmlspecialchars(strtoupper($namaInstansi)) . '</b></td></tr>';
-if (!empty($alamat)) {
-    echo '<tr><td colspan="20" align="center">' . htmlspecialchars($alamat) . '</td></tr>';
+// Calculate dynamic colspan based on report type
+$headerColspan = 10;
+switch ($reportType) {
+    case 'penghuni':
+        $headerColspan = 10;
+        break;
+    case 'overstaying':
+        $headerColspan = 11;
+        break;
+    case 'integrasi':
+        $headerColspan = 15;
+        break;
+    case 'rekapitulasi':
+        $headerColspan = 9;
+        break;
 }
-echo '<tr><td colspan="20" align="center"><b>' . htmlspecialchars($reportTitles[$reportType]) . '</b></td></tr>';
+
+echo '<tr><td colspan="' . $headerColspan . '" align="center" style="font-size: 16px; font-weight: bold;">' . htmlspecialchars($reportTitles[$reportType]) . '</td></tr>';
 
 // Print Periode correctly based on filter
 $periodeStr = 'Semua Periode';
 if (!empty($tanggalMulai) && !empty($tanggalAkhir)) {
-    $periodeStr = date('d/m/Y', strtotime($tanggalMulai)) . ' - ' . date('d/m/Y', strtotime($tanggalAkhir));
+    $periodeStr = date('d F Y', strtotime($tanggalMulai)) . ' - ' . date('d F Y', strtotime($tanggalAkhir));
 } elseif (!empty($tanggalMulai)) {
-    $periodeStr = 'Mulai ' . date('d/m/Y', strtotime($tanggalMulai));
+    $periodeStr = 'Mulai ' . date('d F Y', strtotime($tanggalMulai));
 } elseif (!empty($tanggalAkhir)) {
-    $periodeStr = 'Sampai ' . date('d/m/Y', strtotime($tanggalAkhir));
+    $periodeStr = 'Sampai ' . date('d F Y', strtotime($tanggalAkhir));
 }
 
-echo '<tr><td colspan="20">Periode: ' . $periodeStr . '</td></tr>';
-echo '<tr><td colspan="20">UPT: ' . htmlspecialchars($uptName) . '</td></tr>';
-echo '<tr><td colspan="20"></td></tr>';
+echo '<tr><td colspan="' . $headerColspan . '">Hari/Tanggal: ' . $periodeStr . '</td></tr>';
+echo '<tr><td colspan="' . $headerColspan . '"></td></tr>';
 
 // Table headers based on report type
 switch ($reportType) {
     case 'penghuni':
-        // Header row 1
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td rowspan="2" align="center"><b>No</b></td>';
-        echo '<td rowspan="2" align="center"><b>UPT</b></td>';
-        echo '<td rowspan="2" align="center"><b>Tanggal</b></td>';
-        echo '<td rowspan="2" align="center"><b>Klasifikasi</b></td>';
-        echo '<td colspan="4" align="center"><b>Tahanan</b></td>';
-        echo '<td colspan="4" align="center"><b>Narapidana</b></td>';
-        echo '<td rowspan="2" align="center"><b>Total</b></td>';
-        echo '</tr>';
-        // Header row 2
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td align="center"><b>DL</b></td>';
-        echo '<td align="center"><b>DP</b></td>';
-        echo '<td align="center"><b>AL</b></td>';
-        echo '<td align="center"><b>AP</b></td>';
-        echo '<td align="center"><b>DL</b></td>';
-        echo '<td align="center"><b>DP</b></td>';
-        echo '<td align="center"><b>AL</b></td>';
-        echo '<td align="center"><b>AP</b></td>';
+        echo '<tr>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>No</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Tanggal</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Unit Pelaksana Teknis</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Kapasitas</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Tahanan</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Narapidana</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Total</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Tingkat Hunian</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>% Over</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Waktu Input</b></td>';
         echo '</tr>';
         
-        // Data rows
         $no = 1;
-        $grandTotal = 0;
+        $grandTotalKapasitas = 0;
+        $grandTotalTahanan = 0;
+        $grandTotalNapi = 0;
+        $grandTotalPenghuni = 0;
+        
         foreach ($data as $row) {
-            $total = (int)($row['tahanan_dewasa_laki'] ?? 0) + (int)($row['tahanan_dewasa_perempuan'] ?? 0) + 
-                     (int)($row['tahanan_anak_laki'] ?? 0) + (int)($row['tahanan_anak_perempuan'] ?? 0) +
-                     (int)($row['narapidana_dewasa_laki'] ?? 0) + (int)($row['narapidana_dewasa_perempuan'] ?? 0) + 
-                     (int)($row['narapidana_anak_laki'] ?? 0) + (int)($row['narapidana_anak_perempuan'] ?? 0);
-            $grandTotal += $total;
+            $kapasitas = (int)($row['kapasitas'] ?? 0);
+            $tahanan = (int)($row['total_tahanan'] ?? 0);
+            $napi = (int)($row['total_narapidana'] ?? 0);
+            $total = (int)($row['total_penghuni'] ?? 0);
+            
+            $grandTotalKapasitas += $kapasitas;
+            $grandTotalTahanan += $tahanan;
+            $grandTotalNapi += $napi;
+            $grandTotalPenghuni += $total;
+            
+            $persen = $kapasitas > 0 ? round((($total - $kapasitas) / $kapasitas) * 100, 1) : 0;
+            $tingkat_hunian = $kapasitas > 0 ? round(($total / $kapasitas) * 100, 1) : 0;
             
             echo '<tr>';
             echo '<td align="center">' . $no++ . '</td>';
-            echo '<td>' . htmlspecialchars($row['nama_upt'] ?? '-') . '</td>';
-            echo '<td align="center">' . date('d/m/Y', strtotime($row['tanggal'])) . '</td>';
-            echo '<td>' . htmlspecialchars($row['klasifikasi_pidana'] ?? '-') . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_dewasa_laki'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_dewasa_perempuan'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_anak_laki'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_anak_perempuan'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['narapidana_dewasa_laki'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['narapidana_dewasa_perempuan'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['narapidana_anak_laki'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['narapidana_anak_perempuan'] ?? 0) . '</td>';
-            echo '<td align="center"><b>' . $total . '</b></td>';
+            $tanggalVal = !empty($row['tanggal']) ? date('d/m/Y', strtotime($row['tanggal'])) : '-';
+            echo '<td align="center">' . $tanggalVal . '</td>';
+            $textUPT = htmlspecialchars($row['nama_upt'] ?? '-');
+            echo '<td>' . $textUPT . '</td>';
+            echo '<td align="center">' . number_format($kapasitas) . '</td>';
+            echo '<td align="center">' . number_format($tahanan) . '</td>';
+            echo '<td align="center">' . number_format($napi) . '</td>';
+            echo '<td align="center"><b>' . number_format($total) . '</b></td>';
+            echo '<td align="center">' . $tingkat_hunian . '%</td>';
+            echo '<td align="center">' . ($persen > 0 ? '+' : '') . $persen . '%</td>';
+            $waktuInput = isset($row['waktu_input']) ? date('d/m/Y H:i:s', strtotime($row['waktu_input'])) : '-';
+            $styleWaktu = '';
+            if (isset($row['waktu_input']) && isset($row['tanggal'])) {
+                $waktuTime = strtotime($row['waktu_input']);
+                $batasWaktu = strtotime($row['tanggal'] . ' 08:00:00');
+                if ($waktuTime > $batasWaktu) {
+                    $styleWaktu = ' style="color: red; font-weight: bold;"';
+                }
+            }
+            echo '<td align="center"' . $styleWaktu . '>' . $waktuInput . '</td>';
             echo '</tr>';
         }
         
-        // Total row
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td colspan="12" align="center"><b>TOTAL</b></td>';
-        echo '<td align="center"><b>' . $grandTotal . '</b></td>';
+        $totalPersen = $grandTotalKapasitas > 0 ? round((($grandTotalPenghuni - $grandTotalKapasitas) / $grandTotalKapasitas) * 100, 1) : 0;
+        $totalTingkatHunian = $grandTotalKapasitas > 0 ? round(($grandTotalPenghuni / $grandTotalKapasitas) * 100, 1) : 0;
+        
+        echo '<tr>';
+        echo '<td colspan="3" align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">TOTAL</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . number_format($grandTotalKapasitas) . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . number_format($grandTotalTahanan) . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . number_format($grandTotalNapi) . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . number_format($grandTotalPenghuni) . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $totalTingkatHunian . '%</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . ($totalPersen > 0 ? '+' : '') . $totalPersen . '%</td>';
+        echo '<td bgcolor="#dcdcdc" style="color: black; font-weight: bold;"></td>';
         echo '</tr>';
         break;
         
     case 'overstaying':
-        // Header row 1
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td rowspan="2" align="center"><b>No</b></td>';
-        echo '<td rowspan="2" align="center"><b>Tanggal</b></td>';
-        echo '<td rowspan="2" align="center"><b>UPT</b></td>';
-        echo '<td colspan="6" align="center"><b>Tahanan</b></td>';
-        echo '<td colspan="6" align="center"><b>Overstaying</b></td>';
-        echo '<td rowspan="2" align="center"><b>Keterangan</b></td>';
-        echo '</tr>';
-        // Header row 2
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td align="center"><b>AI</b></td>';
-        echo '<td align="center"><b>AII</b></td>';
-        echo '<td align="center"><b>AIII</b></td>';
-        echo '<td align="center"><b>AIV</b></td>';
-        echo '<td align="center"><b>AV</b></td>';
-        echo '<td align="center"><b>Jml</b></td>';
-        echo '<td align="center"><b>AI</b></td>';
-        echo '<td align="center"><b>AII</b></td>';
-        echo '<td align="center"><b>AIII</b></td>';
-        echo '<td align="center"><b>AIV</b></td>';
-        echo '<td align="center"><b>AV</b></td>';
-        echo '<td align="center"><b>Jml</b></td>';
+        echo '<tr>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>NO</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>TANGGAL</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>NAMA UPT</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>AI</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>AII</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>AIII</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>AIV</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>AV</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>JUMLAH</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>KETERANGAN</b></td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black;"><b>Waktu Input</b></td>';
         echo '</tr>';
         
-        // Data rows
         $no = 1;
-        $total_t_ai = 0; $total_t_aii = 0; $total_t_aiii = 0; $total_t_aiv = 0; $total_t_av = 0; $total_t_jml = 0;
         $total_o_ai = 0; $total_o_aii = 0; $total_o_aiii = 0; $total_o_aiv = 0; $total_o_av = 0; $total_o_jml = 0;
         
         foreach ($data as $row) {
-            $t_jml = (int)($row['tahanan_ai'] ?? 0) + (int)($row['tahanan_aii'] ?? 0) + (int)($row['tahanan_aiii'] ?? 0) + (int)($row['tahanan_aiv'] ?? 0) + (int)($row['tahanan_av'] ?? 0);
             $o_jml = (int)($row['overstaying_ai'] ?? 0) + (int)($row['overstaying_aii'] ?? 0) + (int)($row['overstaying_aiii'] ?? 0) + (int)($row['overstaying_aiv'] ?? 0) + (int)($row['overstaying_av'] ?? 0);
-            
-            $total_t_ai += (int)($row['tahanan_ai'] ?? 0);
-            $total_t_aii += (int)($row['tahanan_aii'] ?? 0);
-            $total_t_aiii += (int)($row['tahanan_aiii'] ?? 0);
-            $total_t_aiv += (int)($row['tahanan_aiv'] ?? 0);
-            $total_t_av += (int)($row['tahanan_av'] ?? 0);
-            $total_t_jml += $t_jml;
             
             $total_o_ai += (int)($row['overstaying_ai'] ?? 0);
             $total_o_aii += (int)($row['overstaying_aii'] ?? 0);
@@ -296,68 +322,73 @@ switch ($reportType) {
             
             echo '<tr>';
             echo '<td align="center">' . $no++ . '</td>';
-            echo '<td align="center">' . date('d/m/Y', strtotime($row['tanggal'])) . '</td>';
+            $tanggalVal = !empty($row['tanggal']) ? date('d/m/Y', strtotime($row['tanggal'])) : '-';
+            echo '<td align="center">' . $tanggalVal . '</td>';
             echo '<td>' . htmlspecialchars($row['nama_upt'] ?? '-') . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_ai'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_aii'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_aiii'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_aiv'] ?? 0) . '</td>';
-            echo '<td align="center">' . (int)($row['tahanan_av'] ?? 0) . '</td>';
-            echo '<td align="center" style="background-color:#e0f2fe;"><b>' . $t_jml . '</b></td>';
             echo '<td align="center">' . (int)($row['overstaying_ai'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_aii'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_aiii'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_aiv'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_av'] ?? 0) . '</td>';
-            echo '<td align="center" style="background-color:#fee2e2;"><b>' . $o_jml . '</b></td>';
-            echo '<td>' . (!empty($row['keterangan']) ? htmlspecialchars($row['keterangan']) : '-') . '</td>';
+            echo '<td align="center"><b>' . $o_jml . '</b></td>';
+            echo '<td>' . (!empty($row['keterangan']) ? htmlspecialchars($row['keterangan']) : 'Nihil') . '</td>';
+            $waktuInput = isset($row['created_at']) ? date('d/m/Y H:i:s', strtotime($row['created_at'])) : '-';
+            $styleWaktu = '';
+            if (isset($row['created_at']) && isset($row['tanggal'])) {
+                $waktuTime = strtotime($row['created_at']);
+                $batasWaktu = strtotime($row['tanggal'] . ' 08:00:00');
+                if ($waktuTime > $batasWaktu) {
+                    $styleWaktu = ' style="color: red; font-weight: bold;"';
+                }
+            }
+            echo '<td align="center"' . $styleWaktu . '>' . $waktuInput . '</td>';
             echo '</tr>';
         }
         
-        // Total row
-        echo '<tr style="background-color: #f8f9fa; font-weight: bold;">';
-        echo '<td colspan="3" align="right">TOTAL KESELURUHAN</td>';
-        echo '<td align="center">' . $total_t_ai . '</td>';
-        echo '<td align="center">' . $total_t_aii . '</td>';
-        echo '<td align="center">' . $total_t_aiii . '</td>';
-        echo '<td align="center">' . $total_t_aiv . '</td>';
-        echo '<td align="center">' . $total_t_av . '</td>';
-        echo '<td align="center" style="background-color:#e0f2fe;">' . $total_t_jml . '</td>';
-        echo '<td align="center">' . $total_o_ai . '</td>';
-        echo '<td align="center">' . $total_o_aii . '</td>';
-        echo '<td align="center">' . $total_o_aiii . '</td>';
-        echo '<td align="center">' . $total_o_aiv . '</td>';
-        echo '<td align="center">' . $total_o_av . '</td>';
-        echo '<td align="center" style="background-color:#fee2e2;">' . $total_o_jml . '</td>';
-        echo '<td></td>';
+        echo '<tr>';
+        echo '<td colspan="3" align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">SUBTOTAL</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $total_o_ai . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $total_o_aii . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $total_o_aiii . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $total_o_aiv . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $total_o_av . '</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $total_o_jml . '</td>';
+        echo '<td bgcolor="#dcdcdc" style="color: black; font-weight: bold;"></td>';
+        echo '<td bgcolor="#dcdcdc" style="color: black; font-weight: bold;"></td>';
+        echo '</tr>';
+        
+        echo '<tr>';
+        echo '<td colspan="8" align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">TOTAL</td>';
+        echo '<td align="center" bgcolor="#dcdcdc" style="color: black; font-weight: bold;">' . $total_o_jml . '</td>';
+        echo '<td bgcolor="#dcdcdc" style="color: black; font-weight: bold;"></td>';
+        echo '<td bgcolor="#dcdcdc" style="color: black; font-weight: bold;"></td>';
         echo '</tr>';
         break;
         
     case 'integrasi':
-        // Header row 1
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td rowspan="2" align="center"><b>No</b></td>';
-        echo '<td rowspan="2" align="center"><b>UPT</b></td>';
-        echo '<td rowspan="2" align="center"><b>Tanggal</b></td>';
-        echo '<td colspan="5" align="center"><b>Usulan</b></td>';
-        echo '<td colspan="5" align="center"><b>SK Terbit</b></td>';
-        echo '<td rowspan="2" align="center"><b>Total</b></td>';
-        echo '</tr>';
-        // Header row 2
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td align="center"><b>PB</b></td>';
-        echo '<td align="center"><b>CB</b></td>';
-        echo '<td align="center"><b>CMB</b></td>';
-        echo '<td align="center"><b>CMK</b></td>';
-        echo '<td align="center"><b>Asim</b></td>';
-        echo '<td align="center"><b>PB</b></td>';
-        echo '<td align="center"><b>CB</b></td>';
-        echo '<td align="center"><b>CMB</b></td>';
-        echo '<td align="center"><b>CMK</b></td>';
-        echo '<td align="center"><b>Asim</b></td>';
+        echo '<tr>';
+        echo '<td rowspan="2" align="center" bgcolor="#34495e" style="color: white;"><b>No</b></td>';
+        echo '<td rowspan="2" align="center" bgcolor="#34495e" style="color: white;"><b>Tanggal</b></td>';
+        echo '<td rowspan="2" align="center" bgcolor="#34495e" style="color: white;"><b>UPT</b></td>';
+        echo '<td colspan="5" align="center" bgcolor="#34495e" style="color: white;"><b>Usulan</b></td>';
+        echo '<td colspan="5" align="center" bgcolor="#34495e" style="color: white;"><b>SK Terbit</b></td>';
+        echo '<td rowspan="2" align="center" bgcolor="#34495e" style="color: white;"><b>Total</b></td>';
+        echo '<td rowspan="2" align="center" bgcolor="#34495e" style="color: white;"><b>Waktu Input</b></td>';
         echo '</tr>';
         
-        // Data rows
+        echo '<tr>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>PB</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>CB</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>CMB</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>CMK</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>Asim</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>PB</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>CB</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>CMB</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>CMK</b></td>';
+        echo '<td align="center" bgcolor="#42576c" style="color: white;"><b>Asim</b></td>';
+        echo '</tr>';
+        
         $no = 1;
         $grandTotal = 0;
         foreach ($data as $row) {
@@ -369,8 +400,9 @@ switch ($reportType) {
             
             echo '<tr>';
             echo '<td align="center">' . $no++ . '</td>';
+            $tanggalVal = !empty($row['tanggal']) ? date('d/m/Y', strtotime($row['tanggal'])) : '-';
+            echo '<td align="center">' . $tanggalVal . '</td>';
             echo '<td>' . htmlspecialchars($row['nama_upt'] ?? '-') . '</td>';
-            echo '<td align="center">' . date('d/m/Y', strtotime($row['tanggal'])) . '</td>';
             echo '<td align="center">' . (int)($row['usulan_pb'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['usulan_cb'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['usulan_cmb'] ?? 0) . '</td>';
@@ -382,31 +414,39 @@ switch ($reportType) {
             echo '<td align="center">' . (int)($row['sk_terbit_cmk'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['sk_terbit_asimilasi'] ?? 0) . '</td>';
             echo '<td align="center"><b>' . $total . '</b></td>';
+            $waktuInput = isset($row['created_at']) ? date('d/m/Y H:i:s', strtotime($row['created_at'])) : '-';
+            $styleWaktu = '';
+            if (isset($row['created_at']) && isset($row['tanggal'])) {
+                $waktuTime = strtotime($row['created_at']);
+                $batasWaktu = strtotime($row['tanggal'] . ' 08:00:00');
+                if ($waktuTime > $batasWaktu) {
+                    $styleWaktu = ' style="color: red; font-weight: bold;"';
+                }
+            }
+            echo '<td align="center"' . $styleWaktu . '>' . $waktuInput . '</td>';
             echo '</tr>';
         }
         
-        // Total row
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td colspan="13" align="center"><b>TOTAL</b></td>';
-        echo '<td align="center"><b>' . $grandTotal . '</b></td>';
+        echo '<tr>';
+        echo '<td colspan="13" align="center" bgcolor="#34495e" style="color: white; font-weight: bold;">TOTAL</td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white; font-weight: bold;">' . $grandTotal . '</td>';
+        echo '<td bgcolor="#34495e" style="color: white; font-weight: bold;"></td>';
         echo '</tr>';
         break;
         
     case 'rekapitulasi':
-        // Header
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td align="center"><b>No</b></td>';
-        echo '<td align="center"><b>UPT</b></td>';
-        echo '<td align="center"><b>Kapasitas</b></td>';
-        echo '<td align="center"><b>Tahanan</b></td>';
-        echo '<td align="center"><b>Narapidana</b></td>';
-        echo '<td align="center"><b>Total</b></td>';
-        echo '<td align="center"><b>% Kapasitas</b></td>';
-        echo '<td align="center"><b>Overstaying</b></td>';
-        echo '<td align="center"><b>Integrasi</b></td>';
+        echo '<tr>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>No</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>UPT</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Kapasitas</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Tahanan</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Narapidana</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Total</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>% Kapasitas</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Overstaying</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Integrasi</b></td>';
         echo '</tr>';
         
-        // Data rows
         $no = 1;
         $grandTotal = 0;
         $grandTahanan = 0;
@@ -438,16 +478,15 @@ switch ($reportType) {
             echo '</tr>';
         }
         
-        // Total row
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td colspan="2" align="center"><b>TOTAL</b></td>';
-        echo '<td align="center">-</td>';
-        echo '<td align="center"><b>' . number_format($grandTahanan) . '</b></td>';
-        echo '<td align="center"><b>' . number_format($grandNarapidana) . '</b></td>';
-        echo '<td align="center"><b>' . number_format($grandTotal) . '</b></td>';
-        echo '<td align="center">-</td>';
-        echo '<td align="center"><b>' . number_format($grandOverstaying) . '</b></td>';
-        echo '<td align="center"><b>' . number_format($grandIntegrasi) . '</b></td>';
+        echo '<tr>';
+        echo '<td colspan="2" align="center" bgcolor="#34495e" style="color: white;"><b>TOTAL</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;">-</td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>' . number_format($grandTahanan) . '</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>' . number_format($grandNarapidana) . '</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>' . number_format($grandTotal) . '</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;">-</td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>' . number_format($grandOverstaying) . '</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>' . number_format($grandIntegrasi) . '</b></td>';
         echo '</tr>';
         break;
 }

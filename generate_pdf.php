@@ -59,6 +59,21 @@ class MYPDF extends TCPDF {
     }
     
     public function Footer() {
+        // Set Y to 20 mm from bottom for QR Code
+        $this->SetY(-20);
+        $y = $this->GetY();
+        
+        $qrText = "✅ Dokumen Valid\ndicetak melalui :\nSULTAN BANTEN @Ditjenpas Banten";
+        $style = array(
+            'border' => false,
+            'padding' => 0,
+            'fgcolor' => array(0,0,0),
+            'bgcolor' => false
+        );
+        // QR Code at X=15, Y=$y, Width=15, Height=15
+        $this->write2DBarcode($qrText, 'QRCODE,L', 15, $y, 15, 15, $style, 'N');
+        
+        // Page number
         $this->SetY(-15);
         $this->SetFont('helvetica', 'I', 7);
         $this->SetTextColor(100, 100, 100);
@@ -264,9 +279,6 @@ function generatePenghuniTable($pdf, $data) {
         $tingkat_hunian = $kapasitas > 0 ? round(($total / $kapasitas) * 100, 1) : 0;
         
         $textUPT = htmlspecialchars($row['nama_upt'] ?? '-');
-        if (!empty($row['tanggal'])) {
-            $textUPT .= "\n(" . date('d/m/Y', strtotime($row['tanggal'])) . ")";
-        }
         $numLines = $pdf->getNumLines($textUPT, $widths[1]);
         $rowH = max(7, $numLines * 3.8); // Reduced multiplier and minimum to compress rows
         
@@ -296,28 +308,30 @@ function generatePenghuniTable($pdf, $data) {
         $pdf->SetFont('helvetica', '', 8);
     }
     
-    // Total Row
-    $totalPersen = $grandTotalKapasitas > 0 ? round((($grandTotalPenghuni - $grandTotalKapasitas) / $grandTotalKapasitas) * 100, 1) : 0;
-    $totalTingkatHunian = $grandTotalKapasitas > 0 ? round(($grandTotalPenghuni / $grandTotalKapasitas) * 100, 1) : 0;
-    
-    $pdf->SetFont('helvetica', 'B', 8);
-    $pdf->SetFillColor(220, 220, 220);
-    $pdf->Cell($widths[0] + $widths[1], 7, 'TOTAL', 1, 0, 'R', true);
-    $pdf->Cell($widths[2], 7, number_format($grandTotalKapasitas), 1, 0, 'C', true);
-    $pdf->Cell($widths[3], 7, number_format($grandTotalTahanan), 1, 0, 'C', true);
-    $pdf->Cell($widths[4], 7, number_format($grandTotalNapi), 1, 0, 'C', true);
-    $pdf->Cell($widths[5], 7, number_format($grandTotalPenghuni), 1, 0, 'C', true);
-    
-    $totalColor = $getPdfColor($totalPersen);
-    $pdf->SetFillColor($totalColor['fill'][0], $totalColor['fill'][1], $totalColor['fill'][2]);
-    $pdf->SetTextColor($totalColor['text'][0], $totalColor['text'][1], $totalColor['text'][2]);
-    
-    $pdf->SetFont('helvetica', 'B', 7);
-    $pdf->Cell($widths[6], 7, $totalTingkatHunian . '%', 1, 0, 'C', true);
-    $pdf->Cell($widths[7], 7, ($totalPersen > 0 ? '+' : '') . $totalPersen . '%', 1, 1, 'C', true);
-    
-    // Reset text color
-    $pdf->SetTextColor(0, 0, 0);
+    // Total Row (Only if single day filter)
+    if ($tanggalMulai === $tanggalAkhir && !empty($tanggalMulai)) {
+        $totalPersen = $grandTotalKapasitas > 0 ? round((($grandTotalPenghuni - $grandTotalKapasitas) / $grandTotalKapasitas) * 100, 1) : 0;
+        $totalTingkatHunian = $grandTotalKapasitas > 0 ? round(($grandTotalPenghuni / $grandTotalKapasitas) * 100, 1) : 0;
+        
+        $pdf->SetFont('helvetica', 'B', 8);
+        $pdf->SetFillColor(220, 220, 220);
+        $pdf->Cell($widths[0] + $widths[1], 7, 'TOTAL', 1, 0, 'C', true);
+        $pdf->Cell($widths[2], 7, number_format($grandTotalKapasitas), 1, 0, 'C', true);
+        $pdf->Cell($widths[3], 7, number_format($grandTotalTahanan), 1, 0, 'C', true);
+        $pdf->Cell($widths[4], 7, number_format($grandTotalNapi), 1, 0, 'C', true);
+        $pdf->Cell($widths[5], 7, number_format($grandTotalPenghuni), 1, 0, 'C', true);
+        
+        $totalColor = $getPdfColor($totalPersen);
+        $pdf->SetFillColor($totalColor['fill'][0], $totalColor['fill'][1], $totalColor['fill'][2]);
+        $pdf->SetTextColor($totalColor['text'][0], $totalColor['text'][1], $totalColor['text'][2]);
+        
+        $pdf->SetFont('helvetica', 'B', 7);
+        $pdf->Cell($widths[6], 7, $totalTingkatHunian . '%', 1, 0, 'C', true);
+        $pdf->Cell($widths[7], 7, ($totalPersen > 0 ? '+' : '') . $totalPersen . '%', 1, 1, 'C', true);
+        
+        // Reset text color
+        $pdf->SetTextColor(0, 0, 0);
+    }
     
     // Footer & Signature
     $pdf->Ln(2);
@@ -388,25 +402,26 @@ function generateOverstayingTable($pdf, $data) {
     $pdf->Ln(2);
     
     // Widths for A4 Portrait (Total 190)
-    $widths = [8, 55, 15, 15, 15, 15, 15, 17, 35];
+    // Shrink AI-AV and balance UPT & Keterangan
+    $widths = [8, 62, 10, 10, 10, 10, 10, 15, 55];
     
-    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->SetFont('helvetica', 'B', 8);
     $pdf->SetFillColor(220, 220, 220); // Light gray
     $pdf->SetTextColor(0, 0, 0);
     
     // Header row
-    $pdf->Cell($widths[0], 10, 'NO', 1, 0, 'C', true);
-    $pdf->Cell($widths[1], 10, 'NAMA UPT', 1, 0, 'C', true);
-    $pdf->Cell($widths[2], 10, 'AI', 1, 0, 'C', true);
-    $pdf->Cell($widths[3], 10, 'AII', 1, 0, 'C', true);
-    $pdf->Cell($widths[4], 10, 'AIII', 1, 0, 'C', true);
-    $pdf->Cell($widths[5], 10, 'AIV', 1, 0, 'C', true);
-    $pdf->Cell($widths[6], 10, 'AV', 1, 0, 'C', true);
-    $pdf->Cell($widths[7], 10, 'JUMLAH', 1, 0, 'C', true);
-    $pdf->Cell($widths[8], 10, 'KETERANGAN', 1, 1, 'C', true);
+    $pdf->Cell($widths[0], 7, 'NO', 1, 0, 'C', true);
+    $pdf->Cell($widths[1], 7, 'NAMA UPT', 1, 0, 'C', true);
+    $pdf->Cell($widths[2], 7, 'AI', 1, 0, 'C', true);
+    $pdf->Cell($widths[3], 7, 'AII', 1, 0, 'C', true);
+    $pdf->Cell($widths[4], 7, 'AIII', 1, 0, 'C', true);
+    $pdf->Cell($widths[5], 7, 'AIV', 1, 0, 'C', true);
+    $pdf->Cell($widths[6], 7, 'AV', 1, 0, 'C', true);
+    $pdf->Cell($widths[7], 7, 'JUMLAH', 1, 0, 'C', true);
+    $pdf->Cell($widths[8], 7, 'KETERANGAN', 1, 1, 'C', true);
     
     // Data rows
-    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetFont('helvetica', '', 8);
     
     $no = 1;
     $total_o_ai = 0; $total_o_aii = 0; $total_o_aiii = 0; $total_o_aiv = 0; $total_o_av = 0; $total_o_jml = 0;
@@ -430,7 +445,7 @@ function generateOverstayingTable($pdf, $data) {
         $numLinesKet = $pdf->getNumLines($textKet, $widths[8]);
         
         $maxLines = max($numLinesUPT, $numLinesKet, 1);
-        $rowH = max(8, $maxLines * 4.5);
+        $rowH = max(6, $maxLines * 4.5);
         
         // Note: For cell heights to match MultiCell exactly, we just pass $rowH
         $pdf->Cell($widths[0], $rowH, $no++, 1, 0, 'C');
@@ -446,9 +461,9 @@ function generateOverstayingTable($pdf, $data) {
         $pdf->Cell($widths[5], $rowH, (int)($row['overstaying_aiv'] ?? 0), 1, 0, 'C');
         $pdf->Cell($widths[6], $rowH, (int)($row['overstaying_av'] ?? 0), 1, 0, 'C');
         
-        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetFont('helvetica', 'B', 8);
         $pdf->Cell($widths[7], $rowH, $o_jml, 1, 0, 'C');
-        $pdf->SetFont('helvetica', '', 9);
+        $pdf->SetFont('helvetica', '', 8);
         
         // MultiCell for Keterangan
         $x = $pdf->GetX();
@@ -456,29 +471,31 @@ function generateOverstayingTable($pdf, $data) {
         $pdf->MultiCell($widths[8], $rowH, $textKet, 1, 'L', false, 1, $x, $y, true, 0, false, true, $rowH, 'M');
     }
     
-    // Subtotal
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->SetFillColor(220, 220, 220);
-    
-    $startX = $pdf->GetX();
-    $startY = $pdf->GetY();
-    
-    $pdf->Cell($widths[0] + $widths[1], 8, 'SUBTOTAL', 1, 0, 'C', true);
-    $pdf->Cell($widths[2], 8, $total_o_ai, 1, 0, 'C', true);
-    $pdf->Cell($widths[3], 8, $total_o_aii, 1, 0, 'C', true);
-    $pdf->Cell($widths[4], 8, $total_o_aiii, 1, 0, 'C', true);
-    $pdf->Cell($widths[5], 8, $total_o_aiv, 1, 0, 'C', true);
-    $pdf->Cell($widths[6], 8, $total_o_av, 1, 0, 'C', true);
-    
-    $spannedX = $pdf->GetX();
-    
-    // JUMLAH & KETERANGAN (spanning 2 rows, vertically centered)
-    $pdf->MultiCell($widths[7], 16, $total_o_jml, 1, 'C', true, 0, $spannedX, $startY, true, 0, false, true, 16, 'M');
-    $pdf->MultiCell($widths[8], 16, '', 1, 'L', true, 0, $spannedX + $widths[7], $startY, true, 0, false, true, 16, 'M');
-    
-    // Total row
-    $pdf->SetXY($startX, $startY + 8);
-    $pdf->Cell($widths[0] + $widths[1] + $widths[2] + $widths[3] + $widths[4] + $widths[5] + $widths[6], 8, 'TOTAL', 1, 1, 'C', true);
+    // Subtotal & Total (Only if single day filter)
+    if ($tanggalMulai === $tanggalAkhir && !empty($tanggalMulai)) {
+        $pdf->SetFont('helvetica', 'B', 8);
+        $pdf->SetFillColor(220, 220, 220);
+        
+        $startX = $pdf->GetX();
+        $startY = $pdf->GetY();
+        
+        $pdf->Cell($widths[0] + $widths[1], 6, 'SUBTOTAL', 1, 0, 'C', true);
+        $pdf->Cell($widths[2], 6, $total_o_ai, 1, 0, 'C', true);
+        $pdf->Cell($widths[3], 6, $total_o_aii, 1, 0, 'C', true);
+        $pdf->Cell($widths[4], 6, $total_o_aiii, 1, 0, 'C', true);
+        $pdf->Cell($widths[5], 6, $total_o_aiv, 1, 0, 'C', true);
+        $pdf->Cell($widths[6], 6, $total_o_av, 1, 0, 'C', true);
+        
+        $spannedX = $pdf->GetX();
+        
+        // JUMLAH & KETERANGAN (spanning 2 rows, vertically centered)
+        $pdf->MultiCell($widths[7], 12, $total_o_jml, 1, 'C', true, 0, $spannedX, $startY, true, 0, false, true, 12, 'M');
+        $pdf->MultiCell($widths[8], 12, '', 1, 'L', true, 0, $spannedX + $widths[7], $startY, true, 0, false, true, 12, 'M');
+        
+        // Total row
+        $pdf->SetXY($startX, $startY + 6);
+        $pdf->Cell($widths[0] + $widths[1] + $widths[2] + $widths[3] + $widths[4] + $widths[5] + $widths[6], 6, 'TOTAL', 1, 1, 'C', true);
+    }
     
     // Footer & Signature
     $pdf->Ln(2); // Reduced from 5
@@ -683,8 +700,8 @@ $pdf->SetSubject('Laporan Monitoring UPT');
 
 $pdf->SetMargins(10, 10, 10);
 $pdf->SetHeaderMargin(5);
-$pdf->SetFooterMargin(10);
-$pdf->SetAutoPageBreak(true, 10);
+$pdf->SetFooterMargin(25);
+$pdf->SetAutoPageBreak(true, 25);
 
 $pdf->AddPage();
 
