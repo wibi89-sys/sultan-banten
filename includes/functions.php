@@ -1152,7 +1152,8 @@ function getTemplateVariables() {
         'tahanan' => 'Total tahanan',
         'isi_penghuni' => 'Total penghuni (tahanan + narapidana)',
         'kapasitas' => 'Total kapasitas UPT',
-        'persen_overkapasitas' => 'Persentase kapasitas terisi',
+        'persen_overkapasitas' => 'Persentase overkapasitas',
+        'tingkat_hunian' => 'Persentase tingkat hunian',
         
         // Kategori Umur
         'anak' => 'Total penghuni anak (tahanan + narapidana, laki + perempuan)',
@@ -1181,6 +1182,8 @@ function getTemplateVariables() {
         'lansia' => 'Lansia >70 tahun',
         'sakit' => 'Sakit Berkepanjangan',
         'uu_ite' => 'Pidana UU ITE',
+        'pidana_mati' => 'Pidana Mati',
+        'seumur_hidup' => 'Seumur Hidup',
         
         // Overstaying
         'overstaying_ai' => 'Overstaying kategori AI',
@@ -1289,11 +1292,13 @@ function generateComprehensiveReport($tanggal = null, $upt_id = null) {
     $report['anak'] = (int)($penghuniData['total_anak'] ?? 0);
     $report['dewasa'] = (int)($penghuniData['total_dewasa'] ?? 0);
     
-    // Calculate overkapasitas percentage
+    // Calculate overkapasitas and tingkat hunian percentage
     if ($report['kapasitas'] > 0) {
         $report['persen_overkapasitas'] = round((($report['isi_penghuni'] - $report['kapasitas']) / $report['kapasitas']) * 100, 1);
+        $report['tingkat_hunian'] = round(($report['isi_penghuni'] / $report['kapasitas']) * 100, 1);
     } else {
         $report['persen_overkapasitas'] = 0;
+        $report['tingkat_hunian'] = 0;
     }
     
     // Get by klasifikasi
@@ -1435,8 +1440,11 @@ function sendScheduledReport($scheduleId) {
     // Format message
     $message = formatTemplateMessage($template, $reportData);
     
-    // Send to group
-    $result = sendWAMessage($schedule['group_id'], $message);
+    // Send to group if not skipped
+    $result = ['success' => true]; // Default true if skipped
+    if (!empty($schedule['group_id']) && $schedule['group_id'] !== '-') {
+        $result = sendWAMessage($schedule['group_id'], $message);
+    }
     
     // Update last sent
     if ($result['success']) {

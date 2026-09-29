@@ -158,6 +158,9 @@ if ($penghuniData) {
     // Calculate overkapasitas percentage: (isi - kapasitas) / kapasitas * 100
     if ($stats['total_kapasitas'] > 0) {
         $stats['persen_overkapasitas'] = round((($stats['total_penghuni'] - $stats['total_kapasitas']) / $stats['total_kapasitas']) * 100, 1);
+        $stats['tingkat_hunian'] = round(($stats['total_penghuni'] / $stats['total_kapasitas']) * 100, 1);
+    } else {
+        $stats['tingkat_hunian'] = 0;
     }
 }
 
@@ -1535,6 +1538,17 @@ function getOverkapasitasColor($persen) {
                         <div class="flex-grow-1">
                             <div class="stat-value-sm"><?= number_format($stats['total_kapasitas'], 0, ',', '.') ?></div>
                             <p class="stat-label-sm">Total Kapasitas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl">
+                <div class="stat-card stat-card-sm stat-overkapasitas h-100 <?= getOverkapasitasColor($stats['persen_overkapasitas']) ?>">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-white bg-opacity-25 me-2"><i class="fas fa-chart-pie"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm"><?= $stats['tingkat_hunian'] ?? 0 ?>%</div>
+                            <p class="stat-label-sm">Tingkat Hunian</p>
                         </div>
                     </div>
                 </div>

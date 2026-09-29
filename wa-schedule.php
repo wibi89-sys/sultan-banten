@@ -37,7 +37,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $jam_kirim = $_POST['jam_kirim'] ?? '12:00';
         $hari = $_POST['hari'] ?? 'daily';
         $template_pesan = $_POST['template_pesan'] ?? '';
-        $kirim_ke_pimpinan = isset($_POST['kirim_ke_pimpinan']) ? 1 : 0;
+        $target_penerima = $_POST['target_penerima'] ?? 'grup';
+        $kirim_ke_pimpinan = ($target_penerima === 'pimpinan' || $target_penerima === 'keduanya') ? 1 : 0;
+        
+        if ($target_penerima === 'pimpinan') {
+            $group_id = '-'; // Bypass required group ID
+        }
         
         if ($nama_laporan && $group_id && $jam_kirim) {
             // Use default template if not provided
@@ -64,7 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $hari = $_POST['hari'] ?? 'daily';
         $aktif = isset($_POST['aktif']) ? 1 : 0;
         $template_pesan = $_POST['template_pesan'] ?? '';
-        $kirim_ke_pimpinan = isset($_POST['kirim_ke_pimpinan_edit']) ? 1 : 0;
+        $target_penerima = $_POST['target_penerima_edit'] ?? 'grup';
+        $kirim_ke_pimpinan = ($target_penerima === 'pimpinan' || $target_penerima === 'keduanya') ? 1 : 0;
+        
+        if ($target_penerima === 'pimpinan') {
+            $group_id = '-';
+        }
         
         if ($id && $nama_laporan && $group_id && $jam_kirim) {
             // If template is empty, use the existing one or default
@@ -374,7 +384,7 @@ $hariOptions = [
                     <?php 
                     $categories = [
                         'Umum' => ['tanggal', 'tanggal_indo', 'waktu_kirim'],
-                        'Data Penghuni' => ['narapidana', 'tahanan', 'isi_penghuni', 'kapasitas', 'persen_overkapasitas'],
+                        'Data Penghuni' => ['narapidana', 'tahanan', 'isi_penghuni', 'kapasitas', 'persen_overkapasitas', 'tingkat_hunian'],
                         'Kategori Umur' => ['anak', 'dewasa'],
                         'Jenis Kelamin' => ['laki_laki', 'perempuan'],
                         'Jenis Pidana - Kelompok' => ['pidum_ite', 'pidsus'],
@@ -416,7 +426,7 @@ $hariOptions = [
                             
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Group ID WhatsApp</label>
-                                <input type="text" name="group_id" class="form-control" 
+                                <input type="text" name="group_id" id="add_group_id" class="form-control" 
                                     value="<?= htmlspecialchars($defaultGroup) ?>"
                                     placeholder="Contoh: HxYz123AbCDEF atau 120363xxx@g.us" required>
                                 <small class="text-muted">
@@ -464,12 +474,20 @@ $hariOptions = [
                         
                         <?php if (!empty($pimpinanList)): ?>
                         <div class="mb-3 p-3 bg-light rounded">
-                            <div class="form-check">
-                                <input type="checkbox" name="kirim_ke_pimpinan" id="kirimKePimpinan" class="form-check-input" value="1">
-                                <label class="form-check-label" for="kirimKePimpinan">
-                                    <i class="fas fa-user-tie text-primary me-1"></i>
-                                    <strong>Kirim juga ke Pimpinan</strong>
-                                </label>
+                            <label class="form-label mb-2"><i class="fas fa-paper-plane me-1"></i>Tujuan Laporan</label>
+                            <div class="d-flex gap-3 flex-wrap">
+                                <div class="form-check">
+                                    <input type="radio" name="target_penerima" id="targetGrup" class="form-check-input" value="grup" checked>
+                                    <label class="form-check-label" for="targetGrup">Ke Grup Saja</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" name="target_penerima" id="targetPimpinan" class="form-check-input" value="pimpinan">
+                                    <label class="form-check-label" for="targetPimpinan">Ke Pimpinan Saja</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" name="target_penerima" id="targetKeduanya" class="form-check-input" value="keduanya">
+                                    <label class="form-check-label" for="targetKeduanya">Keduanya</label>
+                                </div>
                             </div>
                             <div class="mt-2 small text-muted">
                                 Laporan akan dikirim ke:
@@ -731,15 +749,23 @@ $hariOptions = [
                         
                         <?php if (!empty($pimpinanList)): ?>
                         <div class="mb-3 p-3 bg-light rounded">
-                            <div class="form-check">
-                                <input type="checkbox" name="kirim_ke_pimpinan_edit" id="edit_kirim_ke_pimpinan" class="form-check-input" value="1">
-                                <label class="form-check-label" for="edit_kirim_ke_pimpinan">
-                                    <i class="fas fa-user-tie text-primary me-1"></i>
-                                    <strong>Kirim juga ke Pimpinan</strong>
-                                </label>
+                            <label class="form-label mb-2"><i class="fas fa-paper-plane me-1"></i>Tujuan Laporan</label>
+                            <div class="d-flex gap-3 flex-wrap">
+                                <div class="form-check">
+                                    <input type="radio" name="target_penerima_edit" id="edit_targetGrup" class="form-check-input" value="grup" checked>
+                                    <label class="form-check-label" for="edit_targetGrup">Ke Grup Saja</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" name="target_penerima_edit" id="edit_targetPimpinan" class="form-check-input" value="pimpinan">
+                                    <label class="form-check-label" for="edit_targetPimpinan">Ke Pimpinan Saja</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" name="target_penerima_edit" id="edit_targetKeduanya" class="form-check-input" value="keduanya">
+                                    <label class="form-check-label" for="edit_targetKeduanya">Keduanya</label>
+                                </div>
                             </div>
                             <div class="mt-2 small text-muted">
-                                Laporan akan dikirim ke:
+                                Laporan akan dikirim ke pimpinan:
                                 <ul class="mb-0 mt-1 ps-3">
                                     <?php foreach ($pimpinanList as $p): ?>
                                     <li><?= htmlspecialchars($p['nama']) ?> (<?= htmlspecialchars($p['no_wa']) ?>)</li>
@@ -872,11 +898,38 @@ _Dikirim pada {waktu_kirim}_`;
             document.getElementById('edit_aktif').checked = schedule.aktif == 1;
             document.getElementById('edit_template').value = schedule.template_pesan || '';
             
-            // Set kirim_ke_pimpinan checkbox if exists
-            const kirimPimpinanCheckbox = document.getElementById('edit_kirim_ke_pimpinan');
-            if (kirimPimpinanCheckbox) {
-                kirimPimpinanCheckbox.checked = schedule.kirim_ke_pimpinan == 1;
+            // Set target_penerima radio buttons
+            if (schedule.kirim_ke_pimpinan == 1 && schedule.group_id == '-') {
+                document.getElementById('edit_targetPimpinan').checked = true;
+            } else if (schedule.kirim_ke_pimpinan == 1 && schedule.group_id != '-') {
+                document.getElementById('edit_targetKeduanya').checked = true;
+            } else {
+                document.getElementById('edit_targetGrup').checked = true;
             }
+            
+            // Setup event listeners for edit radio buttons
+            const editGroup = document.getElementById('edit_targetGrup');
+            const editPimpinan = document.getElementById('edit_targetPimpinan');
+            const editKeduanya = document.getElementById('edit_targetKeduanya');
+            const editGroupId = document.getElementById('edit_group_id');
+            
+            function toggleEditGroup() {
+                if (editPimpinan.checked) {
+                    editGroupId.required = false;
+                    editGroupId.value = '-';
+                    editGroupId.closest('.col-md-6').style.display = 'none';
+                } else {
+                    editGroupId.required = true;
+                    if (editGroupId.value === '-') editGroupId.value = '';
+                    editGroupId.closest('.col-md-6').style.display = 'block';
+                }
+            }
+            
+            editGroup.addEventListener('change', toggleEditGroup);
+            editPimpinan.addEventListener('change', toggleEditGroup);
+            editKeduanya.addEventListener('change', toggleEditGroup);
+            
+            toggleEditGroup(); // Initial call
             
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
             modal.show();
@@ -887,6 +940,34 @@ _Dikirim pada {waktu_kirim}_`;
             document.getElementById('previewTemplateInput').value = document.getElementById('templateEditor').value;
             document.querySelector('button[type="submit"][formmethod="POST"]')?.click();
         }
+        // Setup event listeners for add radio buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            const addGroup = document.getElementById('targetGrup');
+            const addPimpinan = document.getElementById('targetPimpinan');
+            const addKeduanya = document.getElementById('targetKeduanya');
+            const addGroupId = document.getElementById('add_group_id');
+            
+            if (addGroup && addPimpinan && addKeduanya && addGroupId) {
+                function toggleAddGroup() {
+                    if (addPimpinan.checked) {
+                        addGroupId.required = false;
+                        addGroupId.value = '-';
+                        addGroupId.closest('.col-md-6').style.display = 'none';
+                    } else {
+                        addGroupId.required = true;
+                        if (addGroupId.value === '-') addGroupId.value = '<?= htmlspecialchars($defaultGroup) ?>';
+                        addGroupId.closest('.col-md-6').style.display = 'block';
+                    }
+                }
+                
+                addGroup.addEventListener('change', toggleAddGroup);
+                addPimpinan.addEventListener('change', toggleAddGroup);
+                addKeduanya.addEventListener('change', toggleAddGroup);
+                
+                toggleAddGroup();
+            }
+        });
+        
     </script>
 </body>
 </html>
