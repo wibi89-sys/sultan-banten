@@ -41,17 +41,29 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
     $data = [];
     $uptClause = $uptId ? "AND upt_id = ?" : "";
     
+    $dateClause = "";
+    $dateParams = [];
+    if (!empty($tanggalMulai) && !empty($tanggalAkhir)) {
+        $dateClause = "AND tanggal BETWEEN ? AND ?";
+        $dateParams = [$tanggalMulai, $tanggalAkhir];
+    } elseif (!empty($tanggalMulai)) {
+        $dateClause = "AND tanggal >= ?";
+        $dateParams = [$tanggalMulai];
+    } elseif (!empty($tanggalAkhir)) {
+        $dateClause = "AND tanggal <= ?";
+        $dateParams = [$tanggalAkhir];
+    }
+    
     try {
         switch ($type) {
             case 'penghuni':
                 $sql = "SELECT dp.*, u.nama_upt FROM data_penghuni dp 
                         JOIN upt u ON dp.upt_id = u.id 
-                        WHERE 1=1 $uptClause AND tanggal BETWEEN ? AND ? 
+                        WHERE 1=1 $uptClause $dateClause 
                         ORDER BY u.nama_upt, dp.tanggal";
                 $params = [];
                 if ($uptId) $params[] = $uptId;
-                $params[] = $tanggalMulai;
-                $params[] = $tanggalAkhir;
+                $params = array_merge($params, $dateParams);
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 $data = $stmt->fetchAll();
@@ -60,12 +72,11 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
             case 'overstaying':
                 $sql = "SELECT do.*, u.nama_upt FROM data_overstaying do 
                         JOIN upt u ON do.upt_id = u.id 
-                        WHERE 1=1 $uptClause AND tanggal BETWEEN ? AND ? 
+                        WHERE 1=1 $uptClause $dateClause 
                         ORDER BY u.nama_upt, do.tanggal";
                 $params = [];
                 if ($uptId) $params[] = $uptId;
-                $params[] = $tanggalMulai;
-                $params[] = $tanggalAkhir;
+                $params = array_merge($params, $dateParams);
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 $data = $stmt->fetchAll();
@@ -74,34 +85,34 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
             case 'integrasi':
                 $sql = "SELECT di.*, u.nama_upt FROM data_integrasi di 
                         JOIN upt u ON di.upt_id = u.id 
-                        WHERE 1=1 $uptClause AND tanggal BETWEEN ? AND ? 
+                        WHERE 1=1 $uptClause $dateClause 
                         ORDER BY u.nama_upt, di.tanggal";
                 $params = [];
                 if ($uptId) $params[] = $uptId;
-                $params[] = $tanggalMulai;
-                $params[] = $tanggalAkhir;
+                $params = array_merge($params, $dateParams);
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 $data = $stmt->fetchAll();
                 break;
                 
             case 'rekapitulasi':
+                $dateClauseRekap = str_replace("tanggal", "tanggal", $dateClause);
                 // Optimized Rekapitulasi query using subqueries to avoid Cartesian product multiplications
                 $sql = "SELECT 
                         u.nama_upt, u.kapasitas,
                         (SELECT COALESCE(SUM(tahanan_dewasa_laki + tahanan_dewasa_perempuan + tahanan_anak_laki + tahanan_anak_perempuan), 0) 
-                         FROM data_penghuni WHERE upt_id = u.id AND tanggal BETWEEN ? AND ?) as total_tahanan,
+                         FROM data_penghuni WHERE upt_id = u.id $dateClauseRekap) as total_tahanan,
                         (SELECT COALESCE(SUM(narapidana_dewasa_laki + narapidana_dewasa_perempuan + narapidana_anak_laki + narapidana_anak_perempuan), 0) 
-                         FROM data_penghuni WHERE upt_id = u.id AND tanggal BETWEEN ? AND ?) as total_narapidana,
+                         FROM data_penghuni WHERE upt_id = u.id $dateClauseRekap) as total_narapidana,
                         (SELECT COALESCE(SUM(tahanan_ai + tahanan_aii + tahanan_aiii + tahanan_aiv + tahanan_av + 
                                             overstaying_ai + overstaying_aii + overstaying_aiii + overstaying_aiv + overstaying_av), 0) 
-                         FROM data_overstaying WHERE upt_id = u.id AND tanggal BETWEEN ? AND ?) as total_overstaying,
+                         FROM data_overstaying WHERE upt_id = u.id $dateClauseRekap) as total_overstaying,
                         (SELECT COALESCE(SUM(usulan_pb + usulan_cb + usulan_cmb + usulan_cmk + usulan_asimilasi + 
                                             sk_terbit_pb + sk_terbit_cb + sk_terbit_cmb + sk_terbit_cmk + sk_terbit_asimilasi), 0) 
-                         FROM data_integrasi WHERE upt_id = u.id AND tanggal BETWEEN ? AND ?) as total_integrasi
+                         FROM data_integrasi WHERE upt_id = u.id $dateClauseRekap) as total_integrasi
                         FROM upt u";
                 
-                $params = [$tanggalMulai, $tanggalAkhir, $tanggalMulai, $tanggalAkhir, $tanggalMulai, $tanggalAkhir, $tanggalMulai, $tanggalAkhir];
+                $params = array_merge($dateParams, $dateParams, $dateParams, $dateParams);
                 
                 if ($uptId) {
                     $sql .= " WHERE u.id = ?";
@@ -160,7 +171,18 @@ if (!empty($alamat)) {
     echo '<tr><td colspan="20" align="center">' . htmlspecialchars($alamat) . '</td></tr>';
 }
 echo '<tr><td colspan="20" align="center"><b>' . htmlspecialchars($reportTitles[$reportType]) . '</b></td></tr>';
-echo '<tr><td colspan="20">Periode: ' . date('d/m/Y', strtotime($tanggalMulai)) . ' - ' . date('d/m/Y', strtotime($tanggalAkhir)) . '</td></tr>';
+
+// Print Periode correctly based on filter
+$periodeStr = 'Semua Periode';
+if (!empty($tanggalMulai) && !empty($tanggalAkhir)) {
+    $periodeStr = date('d/m/Y', strtotime($tanggalMulai)) . ' - ' . date('d/m/Y', strtotime($tanggalAkhir));
+} elseif (!empty($tanggalMulai)) {
+    $periodeStr = 'Mulai ' . date('d/m/Y', strtotime($tanggalMulai));
+} elseif (!empty($tanggalAkhir)) {
+    $periodeStr = 'Sampai ' . date('d/m/Y', strtotime($tanggalAkhir));
+}
+
+echo '<tr><td colspan="20">Periode: ' . $periodeStr . '</td></tr>';
 echo '<tr><td colspan="20">UPT: ' . htmlspecialchars($uptName) . '</td></tr>';
 echo '<tr><td colspan="20"></td></tr>';
 
@@ -227,11 +249,11 @@ switch ($reportType) {
         // Header row 1
         echo '<tr style="background-color: #34495e; color: white;">';
         echo '<td rowspan="2" align="center"><b>No</b></td>';
-        echo '<td rowspan="2" align="center"><b>UPT</b></td>';
         echo '<td rowspan="2" align="center"><b>Tanggal</b></td>';
-        echo '<td colspan="5" align="center"><b>Tahanan</b></td>';
-        echo '<td colspan="5" align="center"><b>Overstaying</b></td>';
-        echo '<td rowspan="2" align="center"><b>Total</b></td>';
+        echo '<td rowspan="2" align="center"><b>UPT</b></td>';
+        echo '<td colspan="6" align="center"><b>Tahanan</b></td>';
+        echo '<td colspan="6" align="center"><b>Overstaying</b></td>';
+        echo '<td rowspan="2" align="center"><b>Keterangan</b></td>';
         echo '</tr>';
         // Header row 2
         echo '<tr style="background-color: #34495e; color: white;">';
@@ -240,45 +262,74 @@ switch ($reportType) {
         echo '<td align="center"><b>AIII</b></td>';
         echo '<td align="center"><b>AIV</b></td>';
         echo '<td align="center"><b>AV</b></td>';
+        echo '<td align="center"><b>Jml</b></td>';
         echo '<td align="center"><b>AI</b></td>';
         echo '<td align="center"><b>AII</b></td>';
         echo '<td align="center"><b>AIII</b></td>';
         echo '<td align="center"><b>AIV</b></td>';
         echo '<td align="center"><b>AV</b></td>';
+        echo '<td align="center"><b>Jml</b></td>';
         echo '</tr>';
         
         // Data rows
         $no = 1;
-        $grandTotal = 0;
+        $total_t_ai = 0; $total_t_aii = 0; $total_t_aiii = 0; $total_t_aiv = 0; $total_t_av = 0; $total_t_jml = 0;
+        $total_o_ai = 0; $total_o_aii = 0; $total_o_aiii = 0; $total_o_aiv = 0; $total_o_av = 0; $total_o_jml = 0;
+        
         foreach ($data as $row) {
-            $total = (int)($row['tahanan_ai'] ?? 0) + (int)($row['tahanan_aii'] ?? 0) + (int)($row['tahanan_aiii'] ?? 0) + 
-                     (int)($row['tahanan_aiv'] ?? 0) + (int)($row['tahanan_av'] ?? 0) +
-                     (int)($row['overstaying_ai'] ?? 0) + (int)($row['overstaying_aii'] ?? 0) + (int)($row['overstaying_aiii'] ?? 0) + 
-                     (int)($row['overstaying_aiv'] ?? 0) + (int)($row['overstaying_av'] ?? 0);
-            $grandTotal += $total;
+            $t_jml = (int)($row['tahanan_ai'] ?? 0) + (int)($row['tahanan_aii'] ?? 0) + (int)($row['tahanan_aiii'] ?? 0) + (int)($row['tahanan_aiv'] ?? 0) + (int)($row['tahanan_av'] ?? 0);
+            $o_jml = (int)($row['overstaying_ai'] ?? 0) + (int)($row['overstaying_aii'] ?? 0) + (int)($row['overstaying_aiii'] ?? 0) + (int)($row['overstaying_aiv'] ?? 0) + (int)($row['overstaying_av'] ?? 0);
+            
+            $total_t_ai += (int)($row['tahanan_ai'] ?? 0);
+            $total_t_aii += (int)($row['tahanan_aii'] ?? 0);
+            $total_t_aiii += (int)($row['tahanan_aiii'] ?? 0);
+            $total_t_aiv += (int)($row['tahanan_aiv'] ?? 0);
+            $total_t_av += (int)($row['tahanan_av'] ?? 0);
+            $total_t_jml += $t_jml;
+            
+            $total_o_ai += (int)($row['overstaying_ai'] ?? 0);
+            $total_o_aii += (int)($row['overstaying_aii'] ?? 0);
+            $total_o_aiii += (int)($row['overstaying_aiii'] ?? 0);
+            $total_o_aiv += (int)($row['overstaying_aiv'] ?? 0);
+            $total_o_av += (int)($row['overstaying_av'] ?? 0);
+            $total_o_jml += $o_jml;
             
             echo '<tr>';
             echo '<td align="center">' . $no++ . '</td>';
-            echo '<td>' . htmlspecialchars($row['nama_upt'] ?? '-') . '</td>';
             echo '<td align="center">' . date('d/m/Y', strtotime($row['tanggal'])) . '</td>';
+            echo '<td>' . htmlspecialchars($row['nama_upt'] ?? '-') . '</td>';
             echo '<td align="center">' . (int)($row['tahanan_ai'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['tahanan_aii'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['tahanan_aiii'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['tahanan_aiv'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['tahanan_av'] ?? 0) . '</td>';
+            echo '<td align="center" style="background-color:#e0f2fe;"><b>' . $t_jml . '</b></td>';
             echo '<td align="center">' . (int)($row['overstaying_ai'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_aii'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_aiii'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_aiv'] ?? 0) . '</td>';
             echo '<td align="center">' . (int)($row['overstaying_av'] ?? 0) . '</td>';
-            echo '<td align="center"><b>' . $total . '</b></td>';
+            echo '<td align="center" style="background-color:#fee2e2;"><b>' . $o_jml . '</b></td>';
+            echo '<td>' . (!empty($row['keterangan']) ? htmlspecialchars($row['keterangan']) : '-') . '</td>';
             echo '</tr>';
         }
         
         // Total row
-        echo '<tr style="background-color: #34495e; color: white;">';
-        echo '<td colspan="13" align="center"><b>TOTAL</b></td>';
-        echo '<td align="center"><b>' . $grandTotal . '</b></td>';
+        echo '<tr style="background-color: #f8f9fa; font-weight: bold;">';
+        echo '<td colspan="3" align="right">TOTAL KESELURUHAN</td>';
+        echo '<td align="center">' . $total_t_ai . '</td>';
+        echo '<td align="center">' . $total_t_aii . '</td>';
+        echo '<td align="center">' . $total_t_aiii . '</td>';
+        echo '<td align="center">' . $total_t_aiv . '</td>';
+        echo '<td align="center">' . $total_t_av . '</td>';
+        echo '<td align="center" style="background-color:#e0f2fe;">' . $total_t_jml . '</td>';
+        echo '<td align="center">' . $total_o_ai . '</td>';
+        echo '<td align="center">' . $total_o_aii . '</td>';
+        echo '<td align="center">' . $total_o_aiii . '</td>';
+        echo '<td align="center">' . $total_o_aiv . '</td>';
+        echo '<td align="center">' . $total_o_av . '</td>';
+        echo '<td align="center" style="background-color:#fee2e2;">' . $total_o_jml . '</td>';
+        echo '<td></td>';
         echo '</tr>';
         break;
         

@@ -459,8 +459,9 @@ function getUptDataTable($dateClause = "", $params = [], $uptFilter = null) {
         $finalParams = array_merge($finalParams, $params);
     }
     
+    $mainWhere = "1=1";
     if ($uptFilter) {
-        $whereClause .= " AND u.id = ?";
+        $mainWhere = "u.id = ?";
         $finalParams[] = $uptFilter;
     }
     
@@ -472,6 +473,7 @@ function getUptDataTable($dateClause = "", $params = [], $uptFilter = null) {
             dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan), 0) as total_penghuni
         FROM upt u
         LEFT JOIN data_penghuni dp ON u.id = dp.upt_id AND $whereClause
+        WHERE $mainWhere
         GROUP BY u.id, u.nama_upt, u.kapasitas
         ORDER BY u.nama_upt";
     

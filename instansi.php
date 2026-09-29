@@ -12,6 +12,23 @@ $instansi = getInstansi();
 $message = '';
 $error = '';
 
+// Check and create logo_kop, ttd_image, stempel_image columns if they don't exist
+try {
+    $pdo->query("ALTER TABLE instansi ADD COLUMN logo_kop VARCHAR(255) NULL");
+} catch(PDOException $e) {}
+
+try {
+    $pdo->query("ALTER TABLE instansi ADD COLUMN ttd_image VARCHAR(255) NULL");
+} catch(PDOException $e) {}
+
+try {
+    $pdo->query("ALTER TABLE instansi ADD COLUMN stempel_image VARCHAR(255) NULL");
+} catch(PDOException $e) {}
+
+try {
+    $instansi = getInstansi();
+} catch(PDOException $e) {}
+
 // Handle POST Requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
@@ -28,6 +45,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$instansi['id']]);
     $instansi = getInstansi();
     $message = 'Logo berhasil dihapus.';
+}
+
+// Handle Delete Logo Kop Surat
+if (isset($_POST['delete_logo_kop']) && !empty($instansi['logo_kop'])) {
+    $logoKopPath = __DIR__ . '/' . $instansi['logo_kop'];
+    if (file_exists($logoKopPath)) unlink($logoKopPath);
+    $stmt = $pdo->prepare("UPDATE instansi SET logo_kop = NULL WHERE id = ?");
+    $stmt->execute([$instansi['id']]);
+    $instansi = getInstansi();
+    $message = 'Logo Kop Surat berhasil dihapus.';
+}
+
+// Handle Delete Tanda Tangan
+if (isset($_POST['delete_ttd_image']) && !empty($instansi['ttd_image'])) {
+    $ttdPath = __DIR__ . '/' . $instansi['ttd_image'];
+    if (file_exists($ttdPath)) unlink($ttdPath);
+    $stmt = $pdo->prepare("UPDATE instansi SET ttd_image = NULL WHERE id = ?");
+    $stmt->execute([$instansi['id']]);
+    $instansi = getInstansi();
+    $message = 'Gambar Tanda Tangan berhasil dihapus.';
+}
+
+// Handle Delete Stempel
+if (isset($_POST['delete_stempel_image']) && !empty($instansi['stempel_image'])) {
+    $stempelPath = __DIR__ . '/' . $instansi['stempel_image'];
+    if (file_exists($stempelPath)) unlink($stempelPath);
+    $stmt = $pdo->prepare("UPDATE instansi SET stempel_image = NULL WHERE id = ?");
+    $stmt->execute([$instansi['id']]);
+    $instansi = getInstansi();
+    $message = 'Gambar Stempel berhasil dihapus.';
 }
 
 // Handle Delete Favicon
@@ -156,10 +203,70 @@ if (isset($_POST['save_settings'])) {
         }
     }
     
+    // Handle logo kop surat upload
+    $logo_kop = $instansi['logo_kop'] ?? '';
+    if (isset($_FILES['logo_kop']) && $_FILES['logo_kop']['error'] === UPLOAD_ERR_OK) {
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        $fileType = $_FILES['logo_kop']['type'];
+        
+        if (in_array($fileType, $allowedTypes)) {
+            $uploadDir = 'uploads/';
+            $uploadPath = __DIR__ . '/' . $uploadDir;
+            
+            if (!is_dir($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+            
+            $extension = pathinfo($_FILES['logo_kop']['name'], PATHINFO_EXTENSION);
+            $fileName = 'logo_kop_' . time() . '.' . $extension;
+            $targetFile = $uploadPath . $fileName;
+            
+            if (move_uploaded_file($_FILES['logo_kop']['tmp_name'], $targetFile)) {
+                // Delete old logo kop if exists
+                if (!empty($logo_kop) && file_exists(__DIR__ . '/' . $logo_kop)) {
+                    unlink(__DIR__ . '/' . $logo_kop);
+                }
+                $logo_kop = $uploadDir . $fileName;
+            }
+        } else {
+            $error = 'Format file logo kop surat tidak didukung. Gunakan JPG, PNG, atau GIF.';
+        }
+    }
+    
+    // Handle Tanda Tangan upload
+    $ttd_image = $instansi['ttd_image'] ?? '';
+    if (isset($_FILES['ttd_image']) && $_FILES['ttd_image']['error'] === UPLOAD_ERR_OK) {
+        $fileType = $_FILES['ttd_image']['type'];
+        if (in_array($fileType, ['image/jpeg', 'image/png', 'image/gif'])) {
+            $uploadPath = __DIR__ . '/uploads/';
+            if (!is_dir($uploadPath)) mkdir($uploadPath, 0755, true);
+            $fileName = 'ttd_' . time() . '.' . pathinfo($_FILES['ttd_image']['name'], PATHINFO_EXTENSION);
+            if (move_uploaded_file($_FILES['ttd_image']['tmp_name'], $uploadPath . $fileName)) {
+                if (!empty($ttd_image) && file_exists(__DIR__ . '/' . $ttd_image)) unlink(__DIR__ . '/' . $ttd_image);
+                $ttd_image = 'uploads/' . $fileName;
+            }
+        }
+    }
+    
+    // Handle Stempel upload
+    $stempel_image = $instansi['stempel_image'] ?? '';
+    if (isset($_FILES['stempel_image']) && $_FILES['stempel_image']['error'] === UPLOAD_ERR_OK) {
+        $fileType = $_FILES['stempel_image']['type'];
+        if (in_array($fileType, ['image/jpeg', 'image/png', 'image/gif'])) {
+            $uploadPath = __DIR__ . '/uploads/';
+            if (!is_dir($uploadPath)) mkdir($uploadPath, 0755, true);
+            $fileName = 'stempel_' . time() . '.' . pathinfo($_FILES['stempel_image']['name'], PATHINFO_EXTENSION);
+            if (move_uploaded_file($_FILES['stempel_image']['tmp_name'], $uploadPath . $fileName)) {
+                if (!empty($stempel_image) && file_exists(__DIR__ . '/' . $stempel_image)) unlink(__DIR__ . '/' . $stempel_image);
+                $stempel_image = 'uploads/' . $fileName;
+            }
+        }
+    }
+    
     if (!$error && !empty($nama_instansi)) {
         try {
-            $stmt = $pdo->prepare("UPDATE instansi SET nama_instansi=?, alamat=?, telepon=?, email=?, website=?, logo=?, running_text=?, latitude=?, longitude=? WHERE id=?");
-            $stmt->execute([$nama_instansi, $alamat, $telepon, $email, $website, $logo, $running_text, $latitude, $longitude, $instansi['id']]);
+            $stmt = $pdo->prepare("UPDATE instansi SET nama_instansi=?, alamat=?, telepon=?, email=?, website=?, logo=?, logo_kop=?, ttd_image=?, stempel_image=?, running_text=?, latitude=?, longitude=? WHERE id=?");
+            $stmt->execute([$nama_instansi, $alamat, $telepon, $email, $website, $logo, $logo_kop, $ttd_image, $stempel_image, $running_text, $latitude, $longitude, $instansi['id']]);
             $message = 'Pengaturan instansi berhasil disimpan.';
             
             // Refresh instansi data
@@ -479,11 +586,63 @@ $faviconUrl = getFavicon();
                                 <i class="fas fa-image" id="logoPlaceholder"></i>
                             <?php endif; ?>
                         </div>
-                        <input type="file" name="logo" class="form-control" accept="image/*" onchange="previewLogo(this)">
-                        <small class="text-muted">Format: JPG, PNG, GIF. Maks: 2MB</small>
+                        <input type="file" name="logo" class="form-control mb-2" accept="image/*" onchange="previewLogo(this)">
+                        
                         <?php if (!empty($instansi['logo'])): ?>
-                        <button type="submit" name="delete_logo" value="1" class="btn btn-outline-danger btn-sm mt-2" onclick="return confirm('Hapus logo ini?')">
+                        <button type="submit" name="delete_logo" value="1" class="btn btn-outline-danger btn-sm mb-3" onclick="return confirm('Hapus logo ini?')">
                             <i class="fas fa-trash me-1"></i> Hapus Logo
+                        </button>
+                        <?php endif; ?>
+
+                        <hr>
+
+                        <label class="form-label">Logo Kop Surat <small>(Untuk Laporan PDF)</small></label>
+                        <div class="logo-preview mb-3" id="logoKopPreview" style="height: 100px;">
+                            <?php if (!empty($instansi['logo_kop'])): ?>
+                                <img src="<?= htmlspecialchars($instansi['logo_kop']) ?>" alt="Logo Kop" id="logoKopImage">
+                            <?php else: ?>
+                                <i class="fas fa-file-invoice" id="logoKopPlaceholder"></i>
+                            <?php endif; ?>
+                        </div>
+                        <input type="file" name="logo_kop" class="form-control" accept="image/*" onchange="previewLogoKop(this)">
+                        <small class="text-muted d-block mb-2">Format: JPG, PNG. Maks: 2MB</small>
+                        <?php if (!empty($instansi['logo_kop'])): ?>
+                        <button type="submit" name="delete_logo_kop" value="1" class="btn btn-outline-danger btn-sm mb-2" onclick="return confirm('Hapus logo kop surat ini?')">
+                            <i class="fas fa-trash me-1"></i> Hapus Logo Kop
+                        </button>
+                        <?php endif; ?>
+
+                        <hr>
+
+                        <label class="form-label">Tanda Tangan <small>(Transparan disarankan)</small></label>
+                        <div class="logo-preview mb-3" style="height: 80px;">
+                            <?php if (!empty($instansi['ttd_image'])): ?>
+                                <img src="<?= htmlspecialchars($instansi['ttd_image']) ?>" alt="Tanda Tangan" style="max-height: 100%; object-fit: contain;">
+                            <?php else: ?>
+                                <i class="fas fa-signature text-muted"></i>
+                            <?php endif; ?>
+                        </div>
+                        <input type="file" name="ttd_image" class="form-control mb-2" accept="image/*">
+                        <?php if (!empty($instansi['ttd_image'])): ?>
+                        <button type="submit" name="delete_ttd_image" value="1" class="btn btn-outline-danger btn-sm mb-2" onclick="return confirm('Hapus Tanda Tangan ini?')">
+                            <i class="fas fa-trash me-1"></i> Hapus TTD
+                        </button>
+                        <?php endif; ?>
+
+                        <hr>
+
+                        <label class="form-label">Stempel Instansi <small>(Transparan disarankan)</small></label>
+                        <div class="logo-preview mb-3" style="height: 80px;">
+                            <?php if (!empty($instansi['stempel_image'])): ?>
+                                <img src="<?= htmlspecialchars($instansi['stempel_image']) ?>" alt="Stempel" style="max-height: 100%; object-fit: contain;">
+                            <?php else: ?>
+                                <i class="fas fa-stamp text-muted"></i>
+                            <?php endif; ?>
+                        </div>
+                        <input type="file" name="stempel_image" class="form-control mb-2" accept="image/*">
+                        <?php if (!empty($instansi['stempel_image'])): ?>
+                        <button type="submit" name="delete_stempel_image" value="1" class="btn btn-outline-danger btn-sm mb-2" onclick="return confirm('Hapus Stempel ini?')">
+                            <i class="fas fa-trash me-1"></i> Hapus Stempel
                         </button>
                         <?php endif; ?>
                     </div>
@@ -748,6 +907,17 @@ $faviconUrl = getFavicon();
                 reader.onload = function(e) {
                     var preview = document.getElementById('bannerPreview');
                     preview.innerHTML = '<img src="' + e.target.result + '" alt="Banner Preview" style="max-width: 100%; max-height: 200px; object-fit: contain;">';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        function previewLogoKop(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var preview = document.getElementById('logoKopPreview');
+                    preview.innerHTML = '<img src="' + e.target.result + '" alt="Logo Kop Preview" style="max-width: 100%; max-height: 100px; object-fit: contain;">';
                 };
                 reader.readAsDataURL(input.files[0]);
             }

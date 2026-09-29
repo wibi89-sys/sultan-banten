@@ -336,6 +336,25 @@ if ($filter_upt > 0) {
 $stmtJenisKejahatan->execute($jenisKejahatanParams);
 $jenisKejahatanData = $stmtJenisKejahatan->fetchAll();
 
+// Get data for "Tabel Pidana Mati dan Seumur Hidup" per UPT
+$pmshQuery = "SELECT 
+    u.id, u.nama_upt,
+    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana = 'Pidana Mati' 
+        THEN dp.tahanan_dewasa_laki + dp.tahanan_dewasa_perempuan + dp.tahanan_anak_laki + dp.tahanan_anak_perempuan + 
+        dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan ELSE 0 END), 0) as pidana_mati,
+    COALESCE(SUM(CASE WHEN dp.klasifikasi_pidana = 'Seumur Hidup' 
+        THEN dp.tahanan_dewasa_laki + dp.tahanan_dewasa_perempuan + dp.tahanan_anak_laki + dp.tahanan_anak_perempuan + 
+        dp.narapidana_dewasa_laki + dp.narapidana_dewasa_perempuan + dp.narapidana_anak_laki + dp.narapidana_anak_perempuan ELSE 0 END), 0) as seumur_hidup
+    FROM upt u
+    LEFT JOIN data_penghuni dp ON u.id = dp.upt_id AND dp.tanggal = ?
+    " . ($filter_upt > 0 ? "WHERE u.id = ?" : "") . "
+    GROUP BY u.id, u.nama_upt
+    ORDER BY u.nama_upt";
+
+$stmtPmsh = $pdo->prepare($pmshQuery);
+$stmtPmsh->execute($jenisKejahatanParams);
+$pmshData = $stmtPmsh->fetchAll();
+
 // Get data for "Data Penghuni Berdasarkan Umur dan Jenis Kelamin" chart
 // Sesuai dengan filter tanggal dan UPT (menggunakan pola yang sama dengan Total Penghuni)
 // Mengecualikan Lainnya (WNA, Sakit Berkepanjangan, Lansia)
@@ -1683,43 +1702,48 @@ function getOverkapasitasColor($persen) {
                 <table class="table table-bordered table-hover table-sm mb-0" style="font-size: 11px; margin-bottom: 0;">
                     <thead class="table-light">
                         <tr>
-                            <th class="text-center py-1" style="width: 30px;">No</th>
-                            <th class="py-1" style="min-width: 100px;">Unit Pelaksana Teknis</th>
-                            <th class="text-center py-1" style="width: 60px;">Kapasitas</th>
-                            <th class="text-center py-1" style="width: 60px;">Tahanan</th>
-                            <th class="text-center py-1" style="width: 60px;">Narapidana</th>
-                            <th class="text-center py-1" style="width: 70px;">Total</th>
-                            <th class="text-center py-1" style="width: 70px;">% Over</th>
+                            <th class="text-center align-middle py-1" style="width: 30px;">No</th>
+                            <th class="align-middle py-1" style="min-width: 100px;">Unit Pelaksana Teknis</th>
+                            <th class="text-center align-middle py-1" style="width: 60px;">Kapasitas</th>
+                            <th class="text-center align-middle py-1" style="width: 60px;">Tahanan</th>
+                            <th class="text-center align-middle py-1" style="width: 60px;">Narapidana</th>
+                            <th class="text-center align-middle py-1" style="width: 70px;">Total</th>
+                            <th class="text-center align-middle py-1" style="width: 75px;">Tingkat<br>Hunian</th>
+                            <th class="text-center align-middle py-1" style="width: 70px;">% Over</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $no = 1; foreach ($uptDataTable as $row): 
                             // Rumus: (isi - kapasitas) / kapasitas * 100
                             $persen = $row['kapasitas'] > 0 ? round((($row['total_penghuni'] - $row['kapasitas']) / $row['kapasitas']) * 100, 1) : 0;
+                            $tingkat_hunian = $row['kapasitas'] > 0 ? round(($row['total_penghuni'] / $row['kapasitas']) * 100, 1) : 0;
                             $colorClass = getOverkapasitasColor($persen);
                         ?>
                         <tr>
-                            <td class="text-center py-1"><?= $no++ ?></td>
-                            <td class="py-1"><?= htmlspecialchars($row['nama_upt']) ?></td>
-                            <td class="text-center py-1"><?= number_format($row['kapasitas']) ?></td>
-                            <td class="text-center py-1"><?= number_format($row['total_tahanan']) ?></td>
-                            <td class="text-center py-1"><?= number_format($row['total_narapidana']) ?></td>
-                            <td class="text-center py-1"><strong><?= number_format($row['total_penghuni']) ?></strong></td>
-                            <td class="text-center py-1 <?= $colorClass ?>" style="font-size: 10px;"><strong><?= $persen > 0 ? '+' : '' ?><?= $persen ?>%</strong></td>
+                            <td class="text-center align-middle py-1"><?= $no++ ?></td>
+                            <td class="align-middle py-1"><?= htmlspecialchars($row['nama_upt']) ?></td>
+                            <td class="text-center align-middle py-1"><?= number_format($row['kapasitas']) ?></td>
+                            <td class="text-center align-middle py-1"><?= number_format($row['total_tahanan']) ?></td>
+                            <td class="text-center align-middle py-1"><?= number_format($row['total_narapidana']) ?></td>
+                            <td class="text-center align-middle py-1"><strong><?= number_format($row['total_penghuni']) ?></strong></td>
+                            <td class="text-center align-middle py-1 <?= $colorClass ?>" style="font-size: 10px;"><strong><?= $tingkat_hunian ?>%</strong></td>
+                            <td class="text-center align-middle py-1 <?= $colorClass ?>" style="font-size: 10px;"><strong><?= $persen > 0 ? '+' : '' ?><?= $persen ?>%</strong></td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if (empty($uptDataTable)): ?>
-                        <tr><td colspan="7" class="text-center text-muted py-2">Belum ada data</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-2">Belum ada data</td></tr>
                         <?php endif; ?>
                     </tbody>
                     <tfoot class="table-light">
                         <tr class="fw-bold">
-                            <td colspan="2" class="text-end py-1">TOTAL</td>
-                            <td class="text-center py-1"><?= number_format($stats['total_kapasitas']) ?></td>
-                            <td class="text-center py-1"><?= number_format($stats['total_tahanan']) ?></td>
-                            <td class="text-center py-1"><?= number_format($stats['total_narapidana']) ?></td>
-                            <td class="text-center py-1"><strong><?= number_format($stats['total_penghuni']) ?></strong></td>
-                            <td class="text-center py-1 <?= getOverkapasitasColor($stats['persen_overkapasitas']) ?>" style="font-size: 10px;">
+                            <td colspan="2" class="text-end align-middle py-1">TOTAL</td>
+                            <td class="text-center align-middle py-1"><?= number_format($stats['total_kapasitas']) ?></td>
+                            <td class="text-center align-middle py-1"><?= number_format($stats['total_tahanan']) ?></td>
+                            <td class="text-center align-middle py-1"><?= number_format($stats['total_narapidana']) ?></td>
+                            <td class="text-center align-middle py-1"><strong><?= number_format($stats['total_penghuni']) ?></strong></td>
+                            <?php $total_tingkat_hunian = $stats['total_kapasitas'] > 0 ? round(($stats['total_penghuni'] / $stats['total_kapasitas']) * 100, 1) : 0; ?>
+                            <td class="text-center align-middle py-1 <?= getOverkapasitasColor($stats['persen_overkapasitas']) ?>" style="font-size: 10px;"><strong><?= $total_tingkat_hunian ?>%</strong></td>
+                            <td class="text-center align-middle py-1 <?= getOverkapasitasColor($stats['persen_overkapasitas']) ?>" style="font-size: 10px;">
                                 <strong><?= $stats['persen_overkapasitas'] > 0 ? '+' : '' ?><?= $stats['persen_overkapasitas'] ?>%</strong>
                             </td>
                         </tr>
@@ -1927,6 +1951,52 @@ function getOverkapasitasColor($persen) {
             </div>
         </div>
 
+        <!-- Tabel Pidana Mati dan Seumur Hidup per UPT -->
+        <div class="table-card mt-3">
+            <h5 class="mb-2 text-danger"><i class="fas fa-skull-crossbones me-2"></i>Data Pidana Mati dan Seumur Hidup per UPT</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm mb-0" style="font-size: 11px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center align-middle py-2" style="width: 40px;">No</th>
+                            <th class="align-middle py-2" style="min-width: 150px;">Unit Pelaksana Teknis</th>
+                            <th class="text-center py-2" style="width: 120px; background-color: rgba(220, 53, 69, 0.1); color: #dc3545;">Pidana Mati</th>
+                            <th class="text-center py-2" style="width: 120px; background-color: rgba(220, 53, 69, 0.1); color: #dc3545;">Seumur Hidup</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $no = 1;
+                        $totalPM = 0;
+                        $totalSH = 0;
+                        foreach ($pmshData as $row): 
+                            $pm = (int)$row['pidana_mati'];
+                            $sh = (int)$row['seumur_hidup'];
+                            
+                            $totalPM += $pm;
+                            $totalSH += $sh;
+                        ?>
+                        <tr>
+                            <td class="text-center py-2"><?= $no++ ?></td>
+                            <td class="py-2"><?= htmlspecialchars($row['nama_upt']) ?></td>
+                            <td class="text-center py-2 text-danger"><strong><?= number_format($pm) ?></strong></td>
+                            <td class="text-center py-2 text-danger"><strong><?= number_format($sh) ?></strong></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($pmshData)): ?>
+                        <tr><td colspan="4" class="text-center text-muted py-3">Belum ada data</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr class="fw-bold">
+                            <td colspan="2" class="text-end py-2">TOTAL</td>
+                            <td class="text-center py-2 text-danger" style="background-color: rgba(220, 53, 69, 0.1);"><?= number_format($totalPM) ?></td>
+                            <td class="text-center py-2 text-danger" style="background-color: rgba(220, 53, 69, 0.1);"><?= number_format($totalSH) ?></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
 
         <!-- Chart Penghuni Berdasarkan Umur dan Jenis Kelamin -->
         <div class="row">

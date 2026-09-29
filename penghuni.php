@@ -600,13 +600,23 @@ $dataPenghuni = $stmt->fetchAll();
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <div class="col-md-5 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm flex-fill">
                                 <i class="fas fa-search me-1"></i>Filter
                             </button>
-                        </div>
-                        <div class="col-md-2">
-                            <a href="?tab=<?= htmlspecialchars($selectedKlasifikasi) ?>" class="btn btn-secondary btn-sm w-100">Reset</a>
+                            <a href="?tab=<?= htmlspecialchars($selectedKlasifikasi) ?>" class="btn btn-secondary btn-sm flex-fill">Reset</a>
+                            <?php
+                                $excelParams = [
+                                    'type' => 'penghuni',
+                                    'tanggal_mulai' => $tanggalMulai,
+                                    'tanggal_akhir' => $tanggalSampai,
+                                    'upt_id' => $filterUpt
+                                ];
+                                $excelUrl = 'generate_excel.php?' . http_build_query(array_filter($excelParams));
+                            ?>
+                            <a href="<?= $excelUrl ?>" target="_blank" class="btn btn-success btn-sm flex-fill">
+                                <i class="fas fa-file-excel me-1"></i>Excel
+                            </a>
                         </div>
                     </form>
                 </div>

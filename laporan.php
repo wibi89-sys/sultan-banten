@@ -249,13 +249,35 @@ $defaultEndDate = date('Y-m-t');
                     </div>
                 </div>
                 
+                <?php if ($reportType == 'overstaying' || $reportType == 'penghuni'): ?>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Tempat TTD</label>
+                        <input type="text" name="tempat_ttd" id="tempat_ttd" class="form-control" placeholder="Contoh: Serang" value="Serang">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Jabatan Penanda Tangan</label>
+                        <input type="text" name="jabatan_ttd" id="jabatan_ttd" class="form-control" placeholder="Contoh: Kepala Bidang Pelayanan dan Pembinaan">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Nama Penanda Tangan</label>
+                        <input type="text" name="nama_ttd" id="nama_ttd" class="form-control" placeholder="Contoh: Surya Dharma">
+                    </div>
+                </div>
+                <?php endif; ?>
+                
                 <hr>
                 
                 <div class="d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
                         <i class="fas fa-redo me-1"></i> Reset
                     </button>
-                    <button type="submit" class="btn btn-success">
+                    <?php if ($reportType == 'overstaying' || $reportType == 'penghuni'): ?>
+                    <button type="button" class="btn btn-danger" onclick="submitPdf()">
+                        <i class="fas fa-file-pdf me-1"></i> Cetak PDF
+                    </button>
+                    <?php endif; ?>
+                    <button type="submit" class="btn btn-success" onclick="document.getElementById('formLaporan').action='generate_excel.php';">
                         <i class="fas fa-file-excel me-1"></i> Download Excel
                     </button>
                 </div>
@@ -282,7 +304,37 @@ $defaultEndDate = date('Y-m-t');
             document.getElementById('tanggal_mulai').value = firstDay.toISOString().split('T')[0];
             document.getElementById('tanggal_akhir').value = lastDay.toISOString().split('T')[0];
             document.getElementById('upt_id').value = '';
+            
+            if (document.getElementById('jabatan_ttd')) {
+                document.getElementById('tempat_ttd').value = 'Serang';
+                document.getElementById('jabatan_ttd').value = '';
+                document.getElementById('nama_ttd').value = '';
+            }
         }
+        
+        function submitPdf() {
+            document.getElementById('formLaporan').action = 'generate_pdf.php';
+            document.getElementById('formLaporan').submit();
+        }
+        
+        // Auto-save and load signature settings
+        window.addEventListener('DOMContentLoaded', function() {
+            const tempatTtd = document.getElementById('tempat_ttd');
+            const jabatanTtd = document.getElementById('jabatan_ttd');
+            const namaTtd = document.getElementById('nama_ttd');
+            
+            if (tempatTtd && jabatanTtd && namaTtd) {
+                // Load saved values
+                if (localStorage.getItem('tempat_ttd')) tempatTtd.value = localStorage.getItem('tempat_ttd');
+                if (localStorage.getItem('jabatan_ttd')) jabatanTtd.value = localStorage.getItem('jabatan_ttd');
+                if (localStorage.getItem('nama_ttd')) namaTtd.value = localStorage.getItem('nama_ttd');
+                
+                // Add event listeners to save on change
+                tempatTtd.addEventListener('input', () => localStorage.setItem('tempat_ttd', tempatTtd.value));
+                jabatanTtd.addEventListener('input', () => localStorage.setItem('jabatan_ttd', jabatanTtd.value));
+                namaTtd.addEventListener('input', () => localStorage.setItem('nama_ttd', namaTtd.value));
+            }
+        });
     </script>
     
     <?php include 'includes/profile_settings.php'; ?>

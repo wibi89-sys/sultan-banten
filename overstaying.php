@@ -165,6 +165,18 @@ $sql = "SELECT do.*, u.nama_upt FROM data_overstaying do JOIN upt u ON do.upt_id
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $dataOverstaying = $stmt->fetchAll();
+
+// Get totals
+$sumSql = "SELECT 
+    SUM(tahanan_ai) as t_ai, SUM(tahanan_aii) as t_aii, SUM(tahanan_aiii) as t_aiii, SUM(tahanan_aiv) as t_aiv, SUM(tahanan_av) as t_av,
+    SUM(overstaying_ai) as o_ai, SUM(overstaying_aii) as o_aii, SUM(overstaying_aiii) as o_aiii, SUM(overstaying_aiv) as o_aiv, SUM(overstaying_av) as o_av
+    FROM data_overstaying do $whereClause";
+$sumStmt = $pdo->prepare($sumSql);
+$sumStmt->execute($params);
+$totals = $sumStmt->fetch();
+if (!$totals) {
+    $totals = array_fill_keys(['t_ai', 't_aii', 't_aiii', 't_aiv', 't_av', 'o_ai', 'o_aii', 'o_aiii', 'o_aiv', 'o_av'], 0);
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -383,13 +395,23 @@ $dataOverstaying = $stmt->fetchAll();
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                <div class="col-md-5 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">
                         <i class="fas fa-search me-1"></i>Filter
                     </button>
-                </div>
-                <div class="col-md-2">
-                    <a href="overstaying.php" class="btn btn-secondary btn-sm w-100">Reset</a>
+                    <a href="overstaying.php" class="btn btn-secondary btn-sm flex-fill">Reset</a>
+                    <?php
+                        $excelParams = [
+                            'type' => 'overstaying',
+                            'tanggal_mulai' => $tanggalMulai,
+                            'tanggal_akhir' => $tanggalSampai,
+                            'upt_id' => $filterUpt
+                        ];
+                        $excelUrl = 'generate_excel.php?' . http_build_query(array_filter($excelParams));
+                    ?>
+                    <a href="<?= $excelUrl ?>" target="_blank" class="btn btn-success btn-sm flex-fill">
+                        <i class="fas fa-file-excel me-1"></i>Excel
+                    </a>
                 </div>
             </form>
         </div>
@@ -448,7 +470,7 @@ $dataOverstaying = $stmt->fetchAll();
                         <?php $no = 1; foreach ($dataOverstaying as $data): 
                             $totalTahanan = $data['tahanan_ai'] + $data['tahanan_aii'] + $data['tahanan_aiii'] + $data['tahanan_aiv'] + $data['tahanan_av'];
                             $totalOverstay = $data['overstaying_ai'] + $data['overstaying_aii'] + $data['overstaying_aiii'] + $data['overstaying_aiv'] + $data['overstaying_av'];
-                            $keteranganText = $totalOverstay > 0 ? "$totalOverstay orang overstaying dari $totalTahanan tahanan" : 'Tidak ada overstaying';
+                            $keteranganText = !empty($data['keterangan']) ? $data['keterangan'] : '-';
                         ?>
                         <tr>
                             <td><?= $no++ ?></td>
@@ -466,10 +488,8 @@ $dataOverstaying = $stmt->fetchAll();
                             <td class="text-center"><?= $data['overstaying_aiv'] ?></td>
                             <td class="text-center"><?= $data['overstaying_av'] ?></td>
                             <td class="text-center fw-bold" style="background:#fee2e2;"><?= $totalOverstay ?></td>
-                            <td>
-                                <span class="badge <?= $totalOverstay > 0 ? 'bg-danger' : 'bg-success' ?> badge-keterangan">
-                                    <?= $keteranganText ?>
-                                </span>
+                            <td class="small" style="max-width: 200px; white-space: normal;">
+                                <?= nl2br(htmlspecialchars($keteranganText)) ?>
                             </td>
                             <td class="text-center">
                                 <button class="btn btn-warning btn-sm py-0 px-1" onclick="editData(<?= htmlspecialchars(json_encode($data), ENT_QUOTES) ?>)">
@@ -487,9 +507,32 @@ $dataOverstaying = $stmt->fetchAll();
                         </tr>
                         <?php endforeach; ?>
                         <?php if (empty($dataOverstaying)): ?>
-                        <tr><td colspan="16" class="text-center text-muted py-3">Belum ada data</td></tr>
+                        <tr><td colspan="17" class="text-center text-muted py-3">Belum ada data</td></tr>
                         <?php endif; ?>
                     </tbody>
+                    <?php if (!empty($dataOverstaying)): 
+                        $totalTahananAll = $totals['t_ai'] + $totals['t_aii'] + $totals['t_aiii'] + $totals['t_aiv'] + $totals['t_av'];
+                        $totalOverstayAll = $totals['o_ai'] + $totals['o_aii'] + $totals['o_aiii'] + $totals['o_aiv'] + $totals['o_av'];
+                    ?>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="3" class="text-end">TOTAL KESELURUHAN</td>
+                            <td class="text-center"><?= number_format((int)$totals['t_ai']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['t_aii']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['t_aiii']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['t_aiv']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['t_av']) ?></td>
+                            <td class="text-center" style="background:#e0f2fe;"><?= number_format($totalTahananAll) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['o_ai']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['o_aii']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['o_aiii']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['o_aiv']) ?></td>
+                            <td class="text-center"><?= number_format((int)$totals['o_av']) ?></td>
+                            <td class="text-center" style="background:#fee2e2;"><?= number_format($totalOverstayAll) ?></td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                    <?php endif; ?>
                 </table>
             </div>
 
