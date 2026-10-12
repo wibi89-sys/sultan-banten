@@ -149,7 +149,7 @@ $defaultEndDate = date('Y-m-t');
                     <a href="instansi.php"><i class="fas fa-cog"></i><span>Pengaturan Instansi</span></a>
                     <?php endif; ?>
                     <a href="pengumuman.php"><i class="fas fa-bullhorn"></i><span>Pengumuman</span></a>
-                    <?php if ($user['role'] === 'admin'): ?>
+                    <?php if (hasAccess('activity_log')): ?>
                     <a href="activity-log.php"><i class="fas fa-history"></i><span>Activity Log</span></a>
                     <?php endif; ?>
                 </div>
@@ -260,34 +260,80 @@ $defaultEndDate = date('Y-m-t');
                     </div>
                 </div>
                 
-                <?php if ($reportType == 'overstaying' || $reportType == 'penghuni' || $reportType == 'bebas_harian'): ?>
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Tempat TTD</label>
-                        <input type="text" name="tempat_ttd" id="tempat_ttd" class="form-control" placeholder="Contoh: Serang" value="Serang">
+                <!-- Pengaturan Tanda Tangan & Pengesahan Dokumen -->
+                <div class="card mb-4 border-0 shadow-sm" style="background: rgba(102, 126, 234, 0.04); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; padding: 20px;">
+                    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                        <h6 class="mb-0 fw-bold text-primary">
+                            <i class="fas fa-file-signature me-2"></i>Pengaturan Pengesahan Laporan (Tanda Tangan, QR Code & Stempel)
+                        </h6>
+                        <div class="d-flex align-items-center gap-1" id="signatureBadges">
+                            <span class="badge bg-primary" id="badge_ttd"><i class="fas fa-signature me-1"></i>TTD: Aktif</span>
+                            <span class="badge bg-success" id="badge_qrcode"><i class="fas fa-qrcode me-1"></i>QR Code: Aktif</span>
+                            <span class="badge bg-danger" id="badge_stempel"><i class="fas fa-stamp me-1"></i>Stempel: Aktif</span>
+                        </div>
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Jabatan Penanda Tangan</label>
-                        <input type="text" name="jabatan_ttd" id="jabatan_ttd" class="form-control" placeholder="Contoh: Kepala Bidang Pelayanan dan Pembinaan">
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tempat TTD</label>
+                            <input type="text" name="tempat_ttd" id="tempat_ttd" class="form-control" placeholder="Contoh: Serang" value="Serang">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Jabatan Penanda Tangan</label>
+                            <input type="text" name="jabatan_ttd" id="jabatan_ttd" class="form-control" placeholder="Contoh: Kepala Bidang Pelayanan dan Pembinaan">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Nama Penanda Tangan</label>
+                            <input type="text" name="nama_ttd" id="nama_ttd" class="form-control" placeholder="Contoh: Surya Dharma">
+                        </div>
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Nama Penanda Tangan</label>
-                        <input type="text" name="nama_ttd" id="nama_ttd" class="form-control" placeholder="Contoh: Surya Dharma">
+
+                    <!-- Hidden inputs for GET form submission -->
+                    <input type="hidden" name="show_ttd" id="hidden_show_ttd" value="<?= ($instansi['tampilkan_ttd'] ?? 1) ? '1' : '0' ?>">
+                    <input type="hidden" name="show_qrcode" id="hidden_show_qrcode" value="<?= ($instansi['tampilkan_qrcode'] ?? 1) ? '1' : '0' ?>">
+                    <input type="hidden" name="show_stempel" id="hidden_show_stempel" value="<?= ($instansi['tampilkan_stempel'] ?? 1) ? '1' : '0' ?>">
+
+                    <label class="form-label fw-semibold mb-2 text-secondary" style="font-size: 13px;">Pilih Elemen yang Ditampilkan / Dihilangkan pada Laporan PDF:</label>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="form-check form-switch p-3 border rounded bg-white shadow-none h-100">
+                                <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" id="toggle_ttd" <?= ($instansi['tampilkan_ttd'] ?? 1) ? 'checked' : '' ?> onchange="updateSignElements()">
+                                <label class="form-check-label fw-bold d-block" for="toggle_ttd" style="cursor: pointer;">
+                                    <i class="fas fa-signature text-primary me-1"></i> Tanda Tangan
+                                </label>
+                                <small class="text-muted d-block mt-1">Sertakan gambar tanda tangan digital/scan.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch p-3 border rounded bg-white shadow-none h-100">
+                                <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" id="toggle_qrcode" <?= ($instansi['tampilkan_qrcode'] ?? 1) ? 'checked' : '' ?> onchange="updateSignElements()">
+                                <label class="form-check-label fw-bold d-block" for="toggle_qrcode" style="cursor: pointer;">
+                                    <i class="fas fa-qrcode text-success me-1"></i> QR Code Verifikasi
+                                </label>
+                                <small class="text-muted d-block mt-1">Sertakan QR Code validasi keaslian dokumen.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch p-3 border rounded bg-white shadow-none h-100">
+                                <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" id="toggle_stempel" <?= ($instansi['tampilkan_stempel'] ?? 1) ? 'checked' : '' ?> onchange="updateSignElements()">
+                                <label class="form-check-label fw-bold d-block" for="toggle_stempel" style="cursor: pointer;">
+                                    <i class="fas fa-stamp text-danger me-1"></i> Stempel / Cap Resmi
+                                </label>
+                                <small class="text-muted d-block mt-1">Sertakan cap stempel resmi instansi.</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <?php endif; ?>
                 
                 <hr>
                 
-                <div class="d-flex justify-content-end gap-2">
+                <div class="d-flex justify-content-end gap-2 flex-wrap">
                     <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
                         <i class="fas fa-redo me-1"></i> Reset
                     </button>
-                    <?php if ($reportType == 'overstaying' || $reportType == 'penghuni' || $reportType == 'bebas_harian'): ?>
                     <button type="button" class="btn btn-danger" onclick="submitPdf()">
                         <i class="fas fa-file-pdf me-1"></i> Cetak PDF
                     </button>
-                    <?php endif; ?>
                     <button type="submit" class="btn btn-success" onclick="document.getElementById('formLaporan').action='generate_excel.php';">
                         <i class="fas fa-file-excel me-1"></i> Download Excel
                     </button>
@@ -307,6 +353,38 @@ $defaultEndDate = date('Y-m-t');
             document.getElementById('sidebar').classList.toggle('show');
         });
         
+        function updateSignElements() {
+            const ttd = document.getElementById('toggle_ttd')?.checked ? '1' : '0';
+            const qr = document.getElementById('toggle_qrcode')?.checked ? '1' : '0';
+            const stempel = document.getElementById('toggle_stempel')?.checked ? '1' : '0';
+
+            if (document.getElementById('hidden_show_ttd')) document.getElementById('hidden_show_ttd').value = ttd;
+            if (document.getElementById('hidden_show_qrcode')) document.getElementById('hidden_show_qrcode').value = qr;
+            if (document.getElementById('hidden_show_stempel')) document.getElementById('hidden_show_stempel').value = stempel;
+
+            // Update badge indicators
+            const badgeTtd = document.getElementById('badge_ttd');
+            const badgeQr = document.getElementById('badge_qrcode');
+            const badgeStempel = document.getElementById('badge_stempel');
+
+            if (badgeTtd) {
+                badgeTtd.className = ttd === '1' ? 'badge bg-primary' : 'badge bg-secondary';
+                badgeTtd.innerHTML = '<i class="fas fa-signature me-1"></i>TTD: ' + (ttd === '1' ? 'Aktif' : 'Nonaktif');
+            }
+            if (badgeQr) {
+                badgeQr.className = qr === '1' ? 'badge bg-success' : 'badge bg-secondary';
+                badgeQr.innerHTML = '<i class="fas fa-qrcode me-1"></i>QR Code: ' + (qr === '1' ? 'Aktif' : 'Nonaktif');
+            }
+            if (badgeStempel) {
+                badgeStempel.className = stempel === '1' ? 'badge bg-danger' : 'badge bg-secondary';
+                badgeStempel.innerHTML = '<i class="fas fa-stamp me-1"></i>Stempel: ' + (stempel === '1' ? 'Aktif' : 'Nonaktif');
+            }
+
+            localStorage.setItem('rep_show_ttd', ttd);
+            localStorage.setItem('rep_show_qrcode', qr);
+            localStorage.setItem('rep_show_stempel', stempel);
+        }
+
         function resetForm() {
             const today = new Date();
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -314,16 +392,23 @@ $defaultEndDate = date('Y-m-t');
             
             document.getElementById('tanggal_mulai').value = firstDay.toISOString().split('T')[0];
             document.getElementById('tanggal_akhir').value = lastDay.toISOString().split('T')[0];
-            document.getElementById('upt_id').value = '';
+            const uptSelect = document.getElementById('upt_id');
+            if (uptSelect) uptSelect.value = '';
             
             if (document.getElementById('jabatan_ttd')) {
                 document.getElementById('tempat_ttd').value = 'Serang';
                 document.getElementById('jabatan_ttd').value = '';
                 document.getElementById('nama_ttd').value = '';
             }
+
+            if (document.getElementById('toggle_ttd')) document.getElementById('toggle_ttd').checked = true;
+            if (document.getElementById('toggle_qrcode')) document.getElementById('toggle_qrcode').checked = true;
+            if (document.getElementById('toggle_stempel')) document.getElementById('toggle_stempel').checked = true;
+            updateSignElements();
         }
         
         function submitPdf() {
+            updateSignElements();
             document.getElementById('formLaporan').action = 'generate_pdf.php';
             document.getElementById('formLaporan').submit();
         }
@@ -335,16 +420,31 @@ $defaultEndDate = date('Y-m-t');
             const namaTtd = document.getElementById('nama_ttd');
             
             if (tempatTtd && jabatanTtd && namaTtd) {
-                // Load saved values
                 if (localStorage.getItem('tempat_ttd')) tempatTtd.value = localStorage.getItem('tempat_ttd');
                 if (localStorage.getItem('jabatan_ttd')) jabatanTtd.value = localStorage.getItem('jabatan_ttd');
                 if (localStorage.getItem('nama_ttd')) namaTtd.value = localStorage.getItem('nama_ttd');
                 
-                // Add event listeners to save on change
                 tempatTtd.addEventListener('input', () => localStorage.setItem('tempat_ttd', tempatTtd.value));
                 jabatanTtd.addEventListener('input', () => localStorage.setItem('jabatan_ttd', jabatanTtd.value));
                 namaTtd.addEventListener('input', () => localStorage.setItem('nama_ttd', namaTtd.value));
             }
+
+            // Restore toggle preferences if saved in localStorage
+            const savedTtd = localStorage.getItem('rep_show_ttd');
+            const savedQr = localStorage.getItem('rep_show_qrcode');
+            const savedStempel = localStorage.getItem('rep_show_stempel');
+
+            if (savedTtd !== null && document.getElementById('toggle_ttd')) {
+                document.getElementById('toggle_ttd').checked = savedTtd === '1';
+            }
+            if (savedQr !== null && document.getElementById('toggle_qrcode')) {
+                document.getElementById('toggle_qrcode').checked = savedQr === '1';
+            }
+            if (savedStempel !== null && document.getElementById('toggle_stempel')) {
+                document.getElementById('toggle_stempel').checked = savedStempel === '1';
+            }
+
+            updateSignElements();
         });
     </script>
     

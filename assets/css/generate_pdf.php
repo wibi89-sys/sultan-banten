@@ -45,6 +45,8 @@ class MYPDF extends TCPDF {
     private $instansi = [];
     private $reportTitle = '';
     public $reportType = 'penghuni';
+    public $showQrCode = true;
+    public $qrCodeContent = '';
     
     public function setInstansi($instansi) {
         $this->instansi = is_array($instansi) ? $instansi : [];
@@ -60,19 +62,22 @@ class MYPDF extends TCPDF {
     }
     
     public function Footer() {
-        // Set Y to 20 mm from bottom for QR Code
-        $this->SetY(-20);
-        $y = $this->GetY();
-        
-        $qrText = "✅ Dokumen Valid\ndicetak melalui :\nSULTAN BANTEN @Ditjenpas Banten";
-        $style = array(
-            'border' => false,
-            'padding' => 0,
-            'fgcolor' => array(0,0,0),
-            'bgcolor' => false
-        );
-        // QR Code at X=15, Y=$y, Width=15, Height=15
-        $this->write2DBarcode($qrText, 'QRCODE,L', 15, $y, 15, 15, $style, 'N');
+        // Tampilkan QR Code di pojok kiri bawah jika diaktifkan
+        if ($this->showQrCode) {
+            // Set Y to 20 mm from bottom for QR Code
+            $this->SetY(-20);
+            $y = $this->GetY();
+            
+            $qrText = !empty($this->qrCodeContent) ? $this->qrCodeContent : "✅ Dokumen Valid\ndicetak melalui :\nSULTAN BANTEN @Ditjenpas Banten";
+            $style = array(
+                'border' => false,
+                'padding' => 0,
+                'fgcolor' => array(0,0,0),
+                'bgcolor' => false
+            );
+            // QR Code at X=15, Y=$y, Width=15, Height=15
+            $this->write2DBarcode($qrText, 'QRCODE,L', 15, $y, 15, 15, $style, 'N');
+        }
         
         // Page number
         $this->SetY(-15);
@@ -233,6 +238,64 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
     return $data;
 }
 
+/**
+ * Render signature block with optional TTD, QR Code, and Stempel
+ */
+function renderPdfSignatureBlock($pdf, $sigX = 130) {
+    global $instansi, $reportType, $reportTitles;
+    
+    $tempatTtd = !empty($_GET['tempat_ttd']) ? $_GET['tempat_ttd'] : 'Serang';
+    $jabatanTtd = !empty($_GET['jabatan_ttd']) ? $_GET['jabatan_ttd'] : 'Kepala Bidang Pelayanan dan Pembinaan';
+    $namaTtd = !empty($_GET['nama_ttd']) ? $_GET['nama_ttd'] : 'Surya Dharma';
+    
+    $showTtd = isset($_GET['show_ttd']) ? (int)$_GET['show_ttd'] : (int)($instansi['tampilkan_ttd'] ?? 1);
+    $showQrCode = isset($_GET['show_qrcode']) ? (int)$_GET['show_qrcode'] : (int)($instansi['tampilkan_qrcode'] ?? 1);
+    $showStempel = isset($_GET['show_stempel']) ? (int)$_GET['show_stempel'] : (int)($instansi['tampilkan_stempel'] ?? 1);
+    
+    $tglTtd = function_exists('formatIndonesianDate') ? formatIndonesianDate(date('Y-m-d'), false) : date('d F Y');
+    
+    // Page break protection if near bottom
+    if ($pdf->GetY() > $pdf->getPageHeight() - 55) {
+        $pdf->AddPage();
+    }
+    
+    // Blok teks tanda tangan di sisi kanan
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetX($sigX);
+    $pdf->Cell(70, 5, $tempatTtd . ', ' . $tglTtd, 0, 1, 'C');
+    $pdf->SetX($sigX);
+    $pdf->Cell(70, 5, $jabatanTtd, 0, 1, 'C');
+    
+    $pdf->Ln(2);
+    $yBeforeSig = $pdf->GetY();
+    
+    $hasTtdImg = $showTtd && !empty($instansi['ttd_image']) && file_exists(__DIR__ . '/' . $instansi['ttd_image']);
+    $hasStempelImg = $showStempel && !empty($instansi['stempel_image']) && file_exists(__DIR__ . '/' . $instansi['stempel_image']);
+    
+    // 1. Tanda Tangan Image (di blok tanda tangan kanan)
+    if ($hasTtdImg) {
+        // TTD di tengah blok tanda tangan (width 40mm)
+        $pdf->Image(__DIR__ . '/' . $instansi['ttd_image'], $sigX + 15, $yBeforeSig - 2, 40, 0);
+    }
+    
+    // 2. Stempel Image (didekatkan ke tulisan dan dibuat sedikit menimpa tanda tangan)
+    if ($hasStempelImg) {
+        if ($hasTtdImg) {
+            // Didekatkan ke tulisan dan menimpa sebagian sisi kiri tanda tangan
+            $pdf->Image(__DIR__ . '/' . $instansi['stempel_image'], $sigX - 8, $yBeforeSig - 4, 36, 0);
+        } else {
+            // Jika tidak ada TTD, posisikan di tengah blok tanda tangan
+            $pdf->Image(__DIR__ . '/' . $instansi['stempel_image'], $sigX + 17, $yBeforeSig - 4, 36, 0);
+        }
+    }
+    
+    // Space before Nama Penanda Tangan
+    $pdf->SetY($yBeforeSig + 22);
+    $pdf->SetX($sigX);
+    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->Cell(70, 5, $namaTtd, 0, 1, 'C');
+}
+
 // Generate Penghuni Table
 function generatePenghuniTable($pdf, $data) {
     global $tanggalMulai, $tanggalAkhir;
@@ -372,44 +435,8 @@ function generatePenghuniTable($pdf, $data) {
     $pdf->SetFont('helvetica', '', 9);
     $pdf->Ln(1);
     $pdf->Cell(0, 5, 'Demikian laporan ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
-    
     $pdf->Ln(5);
-    
-    // Signatures
-    $tempatTtd = $_GET['tempat_ttd'] ?? 'Serang';
-    $jabatanTtd = $_GET['jabatan_ttd'] ?? 'Kepala Bidang Pelayanan dan Pembinaan';
-    $namaTtd = $_GET['nama_ttd'] ?? 'Surya Dharma';
-    
-    $tglTtd = function_exists('formatIndonesianDate') ? formatIndonesianDate(date('Y-m-d'), false) : date('d F Y');
-    
-    $sigX = 130;
-    $pdf->SetX($sigX);
-    $pdf->Cell(70, 5, $tempatTtd . ', ' . $tglTtd, 0, 1, 'C');
-    $pdf->SetX($sigX);
-    $pdf->Cell(70, 5, $jabatanTtd, 0, 1, 'C');
-    
-    $pdf->Ln(2); // Compressed signature space
-    
-    $yBeforeSig = $pdf->GetY();
-    
-    global $instansi;
-    
-    // Print TTD first (so Stempel overlaps it)
-    if (!empty($instansi['ttd_image']) && file_exists(__DIR__ . '/' . $instansi['ttd_image'])) {
-        // TTD di tengah blok tanda tangan, lebar proporsional 40mm
-        $pdf->Image(__DIR__ . '/' . $instansi['ttd_image'], $sigX + 15, $yBeforeSig - 2, 40, 0);
-    }
-    
-    // Print Stempel
-    if (!empty($instansi['stempel_image']) && file_exists(__DIR__ . '/' . $instansi['stempel_image'])) {
-        // Stempel ukuran 4 cm (40 mm), diletakkan lebih menimpa TTD
-        $pdf->Image(__DIR__ . '/' . $instansi['stempel_image'], $sigX - 12, $yBeforeSig - 7, 40, 0);
-    }
-    
-    $pdf->Ln(15);
-    $pdf->SetX($sigX);
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->Cell(70, 5, $namaTtd, 0, 1, 'C');
+    renderPdfSignatureBlock($pdf, 130);
 }
 
 // Generate Overstaying Table
@@ -538,49 +565,13 @@ function generateOverstayingTable($pdf, $data) {
     $pdf->Ln(1); // Reduced from 2
     $pdf->Cell(0, 5, 'Demikian laporan ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
     
-    $pdf->Ln(5); // Reduced from 15
-    
-    // Signatures
-    $tempatTtd = $_GET['tempat_ttd'] ?? 'Serang';
-    $jabatanTtd = $_GET['jabatan_ttd'] ?? 'Kepala Bidang Pelayanan dan Pembinaan';
-    $namaTtd = $_GET['nama_ttd'] ?? 'Surya Dharma';
-    
-    // Date of signature = today
-    $tglTtd = function_exists('formatIndonesianDate') ? formatIndonesianDate(date('Y-m-d'), false) : date('d F Y');
-    
-    // Move to the right side (width is 190, signature box can be 70 wide at position 130)
-    $sigX = 130;
-    
-    $pdf->SetX($sigX);
-    $pdf->Cell(70, 5, $tempatTtd . ', ' . $tglTtd, 0, 1, 'C');
-    
-    $pdf->SetX($sigX);
-    $pdf->Cell(70, 5, $jabatanTtd, 0, 1, 'C');
-    
-    // Signature space
-    $pdf->Ln(2); // Reduced space to make room for image
-    
-    $yBeforeSig = $pdf->GetY();
-    
-    global $instansi;
-    
-    // Print TTD first (so Stempel overlaps it)
-    if (!empty($instansi['ttd_image']) && file_exists(__DIR__ . '/' . $instansi['ttd_image'])) {
-        // TTD di tengah blok tanda tangan, lebar proporsional 40mm
-        $pdf->Image(__DIR__ . '/' . $instansi['ttd_image'], $sigX + 15, $yBeforeSig - 2, 40, 0);
-    }
-    
-    // Print Stempel
-    if (!empty($instansi['stempel_image']) && file_exists(__DIR__ . '/' . $instansi['stempel_image'])) {
-        // Stempel ukuran 4 cm (40 mm), diletakkan lebih menimpa TTD
-        $pdf->Image(__DIR__ . '/' . $instansi['stempel_image'], $sigX - 12, $yBeforeSig - 7, 40, 0);
-    }
-    
-    $pdf->Ln(15);
-    
-    $pdf->SetX($sigX);
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->Cell(70, 5, $namaTtd, 0, 1, 'C');
+    // Footer & Signature
+    $pdf->Ln(2);
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->Ln(1);
+    $pdf->Cell(0, 5, 'Demikian laporan ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
+    $pdf->Ln(5);
+    renderPdfSignatureBlock($pdf, 130);
 }
 
 // Generate Integrasi Table
@@ -654,6 +645,13 @@ function generateIntegrasiTable($pdf, $data) {
     $pdf->SetTextColor(255, 255, 255);
     $pdf->Cell(array_sum(array_slice($widths, 0, 13)), 6, 'TOTAL', 1, 0, 'C', true);
     $pdf->Cell($widths[13], 6, $grandTotal, 1, 1, 'C', true);
+    
+    // Footer & Signature (Landscape sigX = 215)
+    $pdf->Ln(4);
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->Cell(0, 5, 'Demikian laporan integrasi ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
+    $pdf->Ln(5);
+    renderPdfSignatureBlock($pdf, 215);
 }
 
 // Generate Rekapitulasi Table
@@ -719,6 +717,13 @@ function generateRekapitulasiTable($pdf, $data) {
     $pdf->Cell($widths[6], 6, '-', 1, 0, 'C', true);
     $pdf->Cell($widths[7], 6, number_format($grandOverstaying), 1, 0, 'C', true);
     $pdf->Cell($widths[8], 6, number_format($grandIntegrasi), 1, 0, 'C', true);
+    
+    // Footer & Signature (Landscape sigX = 215)
+    $pdf->Ln(4);
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->Cell(0, 5, 'Demikian laporan rekapitulasi ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
+    $pdf->Ln(5);
+    renderPdfSignatureBlock($pdf, 215);
 }
 
 // Function generateBebasHarianTable
@@ -835,32 +840,7 @@ function generateBebasHarianTable($pdf, $data) {
     $pdf->SetFont('helvetica', '', 9);
     $pdf->Cell(0, 5, 'Demikian laporan pengeluaran / bebas harian ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
     $pdf->Ln(5);
-    
-    $tempatTtd = $_GET['tempat_ttd'] ?? 'Serang';
-    $jabatanTtd = $_GET['jabatan_ttd'] ?? 'Kepala Bidang Pelayanan dan Pembinaan';
-    $namaTtd = $_GET['nama_ttd'] ?? 'Surya Dharma';
-    $tglTtd = function_exists('formatIndonesianDate') ? formatIndonesianDate(date('Y-m-d'), false) : date('d F Y');
-    
-    $sigX = 130;
-    $pdf->SetX($sigX);
-    $pdf->Cell(70, 5, $tempatTtd . ', ' . $tglTtd, 0, 1, 'C');
-    $pdf->SetX($sigX);
-    $pdf->Cell(70, 5, $jabatanTtd, 0, 1, 'C');
-    $pdf->Ln(2);
-    
-    $yBeforeSig = $pdf->GetY();
-    global $instansi;
-    if (!empty($instansi['ttd_image']) && file_exists(__DIR__ . '/' . $instansi['ttd_image'])) {
-        $pdf->Image(__DIR__ . '/' . $instansi['ttd_image'], $sigX + 15, $yBeforeSig - 2, 40, 0);
-    }
-    if (!empty($instansi['stempel_image']) && file_exists(__DIR__ . '/' . $instansi['stempel_image'])) {
-        $pdf->Image(__DIR__ . '/' . $instansi['stempel_image'], $sigX + 5, $yBeforeSig - 5, 35, 0);
-    }
-    
-    $pdf->Ln(20);
-    $pdf->SetFont('helvetica', 'B', 10);
-    $pdf->SetX($sigX);
-    $pdf->Cell(70, 5, $namaTtd, 0, 1, 'C');
+    renderPdfSignatureBlock($pdf, 130);
 }
 
 // Create PDF
@@ -869,6 +849,12 @@ $pdf = new MYPDF($orientation, 'mm', 'A4', true, 'UTF-8', false);
 $pdf->setInstansi($instansi);
 $pdf->reportType = $reportType;
 $pdf->setReportTitle($reportTitles[$reportType] ?? 'Laporan');
+
+$showQrCode = isset($_GET['show_qrcode']) ? (int)$_GET['show_qrcode'] : (int)($instansi['tampilkan_qrcode'] ?? 1);
+$pdf->showQrCode = (bool)$showQrCode;
+if (!empty($instansi['qrcode_content'])) {
+    $pdf->qrCodeContent = $instansi['qrcode_content'];
+}
 $pdf->SetCreator('Sistem Monitoring UPT');
 $pdf->SetAuthor($user['nama_lengkap'] ?? 'Admin');
 $pdf->SetTitle($reportTitles[$reportType] ?? 'Laporan');

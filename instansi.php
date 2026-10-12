@@ -26,6 +26,22 @@ try {
 } catch(PDOException $e) {}
 
 try {
+    $pdo->query("ALTER TABLE instansi ADD COLUMN tampilkan_ttd TINYINT(1) DEFAULT 1");
+} catch(PDOException $e) {}
+
+try {
+    $pdo->query("ALTER TABLE instansi ADD COLUMN tampilkan_qrcode TINYINT(1) DEFAULT 1");
+} catch(PDOException $e) {}
+
+try {
+    $pdo->query("ALTER TABLE instansi ADD COLUMN tampilkan_stempel TINYINT(1) DEFAULT 1");
+} catch(PDOException $e) {}
+
+try {
+    $pdo->query("ALTER TABLE instansi ADD COLUMN qrcode_content VARCHAR(255) NULL");
+} catch(PDOException $e) {}
+
+try {
     $instansi = getInstansi();
 } catch(PDOException $e) {}
 
@@ -263,10 +279,15 @@ if (isset($_POST['save_settings'])) {
         }
     }
     
+    $tampilkan_ttd = isset($_POST['tampilkan_ttd']) ? 1 : 0;
+    $tampilkan_qrcode = isset($_POST['tampilkan_qrcode']) ? 1 : 0;
+    $tampilkan_stempel = isset($_POST['tampilkan_stempel']) ? 1 : 0;
+    $qrcode_content = sanitize($_POST['qrcode_content'] ?? '');
+    
     if (!$error && !empty($nama_instansi)) {
         try {
-            $stmt = $pdo->prepare("UPDATE instansi SET nama_instansi=?, alamat=?, telepon=?, email=?, website=?, logo=?, logo_kop=?, ttd_image=?, stempel_image=?, running_text=?, latitude=?, longitude=? WHERE id=?");
-            $stmt->execute([$nama_instansi, $alamat, $telepon, $email, $website, $logo, $logo_kop, $ttd_image, $stempel_image, $running_text, $latitude, $longitude, $instansi['id']]);
+            $stmt = $pdo->prepare("UPDATE instansi SET nama_instansi=?, alamat=?, telepon=?, email=?, website=?, logo=?, logo_kop=?, ttd_image=?, stempel_image=?, tampilkan_ttd=?, tampilkan_qrcode=?, tampilkan_stempel=?, qrcode_content=?, running_text=?, latitude=?, longitude=? WHERE id=?");
+            $stmt->execute([$nama_instansi, $alamat, $telepon, $email, $website, $logo, $logo_kop, $ttd_image, $stempel_image, $tampilkan_ttd, $tampilkan_qrcode, $tampilkan_stempel, $qrcode_content, $running_text, $latitude, $longitude, $instansi['id']]);
             $message = 'Pengaturan instansi berhasil disimpan.';
             
             // Refresh instansi data
@@ -470,6 +491,9 @@ $faviconUrl = getFavicon();
                     <a href="instansi.php" class="active"><i class="fas fa-cog"></i><span>Pengaturan Instansi</span></a>
                     <?php endif; ?>
                     <a href="pengumuman.php"><i class="fas fa-bullhorn"></i><span>Pengumuman</span></a>
+                    <?php if (hasAccess('activity_log')): ?>
+                    <a href="activity-log.php"><i class="fas fa-history"></i><span>Activity Log</span></a>
+                    <?php endif; ?>
                 </div>
             </div>
             
@@ -649,6 +673,47 @@ $faviconUrl = getFavicon();
                             <i class="fas fa-trash me-1"></i> Hapus Stempel
                         </button>
                         <?php endif; ?>
+
+                        <hr>
+
+                        <h6 class="fw-bold text-primary mb-3">
+                            <i class="fas fa-sliders-h me-2"></i>Default Opsi Pengesahan Laporan
+                        </h6>
+                        <div class="mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" name="tampilkan_ttd" value="1" id="instansi_tampilkan_ttd" <?= ($instansi['tampilkan_ttd'] ?? 1) ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="instansi_tampilkan_ttd">
+                                    <i class="fas fa-signature text-primary me-1"></i> Tampilkan Tanda Tangan
+                                </label>
+                                <small class="text-muted d-block">Default tampilkan tanda tangan digital pada laporan PDF</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" name="tampilkan_qrcode" value="1" id="instansi_tampilkan_qrcode" <?= ($instansi['tampilkan_qrcode'] ?? 1) ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="instansi_tampilkan_qrcode">
+                                    <i class="fas fa-qrcode text-success me-1"></i> Tampilkan QR Code Verifikasi
+                                </label>
+                                <small class="text-muted d-block">Default sertakan QR Code verifikasi dokumen elektronik</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" name="tampilkan_stempel" value="1" id="instansi_tampilkan_stempel" <?= ($instansi['tampilkan_stempel'] ?? 1) ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="instansi_tampilkan_stempel">
+                                    <i class="fas fa-stamp text-danger me-1"></i> Tampilkan Stempel Instansi
+                                </label>
+                                <small class="text-muted d-block">Default tampilkan cap/stempel instansi resmi pada laporan PDF</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Keterangan / URL QR Code <small>(Opsional)</small></label>
+                            <input type="text" name="qrcode_content" class="form-control" value="<?= htmlspecialchars($instansi['qrcode_content'] ?? '') ?>" placeholder="Kosongkan untuk otomatis format verifikasi standar">
+                            <small class="text-muted">Dapat diisi URL verifikasi atau teks kustom yang akan dienkode ke dalam QR Code.</small>
+                        </div>
                     </div>
                 </div>
                 

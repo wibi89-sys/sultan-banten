@@ -378,6 +378,9 @@ $unreadCount = $stmt->fetchColumn();
                     <a href="instansi.php"><i class="fas fa-cog"></i><span>Pengaturan Instansi</span></a>
                     <?php endif; ?>
                     <a href="pengumuman.php" class="active"><i class="fas fa-bullhorn"></i><span>Pengumuman</span></a>
+                    <?php if (hasAccess('activity_log')): ?>
+                    <a href="activity-log.php"><i class="fas fa-history"></i><span>Activity Log</span></a>
+                    <?php endif; ?>
                 </div>
             </div>
             

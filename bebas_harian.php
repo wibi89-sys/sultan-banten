@@ -403,6 +403,10 @@ if (isset($_GET['ajax_detail']) && isset($_GET['upt_id']) && isset($_GET['tangga
                     <?php if (hasAccess('instansi')): ?>
                     <a href="instansi.php"><i class="fas fa-cogs"></i><span>Pengaturan Instansi</span></a>
                     <?php endif; ?>
+                    <a href="pengumuman.php"><i class="fas fa-bullhorn"></i><span>Pengumuman</span></a>
+                    <?php if (hasAccess('activity_log')): ?>
+                    <a href="activity-log.php"><i class="fas fa-history"></i><span>Activity Log</span></a>
+                    <?php endif; ?>
                 </div>
             </div>
 

@@ -739,6 +739,24 @@ if (!file_exists($lockFile)) {
     } catch (Exception $e) {}
 
     try {
+        $stmtCol = $pdo->query("SHOW COLUMNS FROM users LIKE 'akses_activity_log'");
+        if (!$stmtCol || !$stmtCol->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN akses_activity_log TINYINT(1) DEFAULT 0 AFTER akses_wa_settings");
+            $pdo->exec("UPDATE users SET akses_activity_log = 1 WHERE role = 'admin'");
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $stmtCol = $pdo->query("SHOW COLUMNS FROM instansi LIKE 'tampilkan_ttd'");
+        if (!$stmtCol || !$stmtCol->fetch()) {
+            $pdo->exec("ALTER TABLE instansi ADD COLUMN tampilkan_ttd TINYINT(1) DEFAULT 1");
+            $pdo->exec("ALTER TABLE instansi ADD COLUMN tampilkan_qrcode TINYINT(1) DEFAULT 1");
+            $pdo->exec("ALTER TABLE instansi ADD COLUMN tampilkan_stempel TINYINT(1) DEFAULT 1");
+            $pdo->exec("ALTER TABLE instansi ADD COLUMN qrcode_content VARCHAR(255) NULL");
+        }
+    } catch (Exception $e) {}
+
+    try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS data_bebas_harian (
             id INT AUTO_INCREMENT PRIMARY KEY,
             upt_id INT NOT NULL,

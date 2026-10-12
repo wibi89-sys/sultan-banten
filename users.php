@@ -39,12 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $akses_upt = isset($_POST['akses_upt']) ? 1 : 0;
         $akses_user = isset($_POST['akses_user']) ? 1 : 0;
         $akses_instansi = isset($_POST['akses_instansi']) ? 1 : 0;
+        $akses_activity_log = isset($_POST['akses_activity_log']) ? 1 : 0;
         
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
         
         try {
-            $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, no_wa, role, upt_id, akses_dashboard, akses_penghuni, akses_overstaying, akses_integrasi, akses_bebas_harian, akses_upt, akses_user, akses_instansi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$username, $hashedPassword, $nama_lengkap, $no_wa, $role, $upt_id, $akses_dashboard, $akses_penghuni, $akses_overstaying, $akses_integrasi, $akses_bebas_harian, $akses_upt, $akses_user, $akses_instansi]);
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, no_wa, role, upt_id, akses_dashboard, akses_penghuni, akses_overstaying, akses_integrasi, akses_bebas_harian, akses_upt, akses_user, akses_instansi, akses_activity_log) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$username, $hashedPassword, $nama_lengkap, $no_wa, $role, $upt_id, $akses_dashboard, $akses_penghuni, $akses_overstaying, $akses_integrasi, $akses_bebas_harian, $akses_upt, $akses_user, $akses_instansi, $akses_activity_log]);
             $message = 'User berhasil ditambahkan.';
             logActivity('tambah', 'user', "Menambahkan user baru: $nama_lengkap ($username)", ['username' => $username, 'nama_lengkap' => $nama_lengkap, 'role' => $role]);
         } catch (PDOException $e) {
@@ -71,15 +72,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $akses_upt = isset($_POST['akses_upt']) ? 1 : 0;
         $akses_user = isset($_POST['akses_user']) ? 1 : 0;
         $akses_instansi = isset($_POST['akses_instansi']) ? 1 : 0;
+        $akses_activity_log = isset($_POST['akses_activity_log']) ? 1 : 0;
         
         // Check if password should be updated
         if (!empty($_POST['password'])) {
             $hashedPassword = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET nama_lengkap=?, no_wa=?, password=?, role=?, upt_id=?, akses_dashboard=?, akses_penghuni=?, akses_overstaying=?, akses_integrasi=?, akses_bebas_harian=?, akses_upt=?, akses_user=?, akses_instansi=? WHERE id=?");
-            $stmt->execute([$nama_lengkap, $no_wa, $hashedPassword, $role, $upt_id, $akses_dashboard, $akses_penghuni, $akses_overstaying, $akses_integrasi, $akses_bebas_harian, $akses_upt, $akses_user, $akses_instansi, $id]);
+            $stmt = $pdo->prepare("UPDATE users SET nama_lengkap=?, no_wa=?, password=?, role=?, upt_id=?, akses_dashboard=?, akses_penghuni=?, akses_overstaying=?, akses_integrasi=?, akses_bebas_harian=?, akses_upt=?, akses_user=?, akses_instansi=?, akses_activity_log=? WHERE id=?");
+            $stmt->execute([$nama_lengkap, $no_wa, $hashedPassword, $role, $upt_id, $akses_dashboard, $akses_penghuni, $akses_overstaying, $akses_integrasi, $akses_bebas_harian, $akses_upt, $akses_user, $akses_instansi, $akses_activity_log, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE users SET nama_lengkap=?, no_wa=?, role=?, upt_id=?, akses_dashboard=?, akses_penghuni=?, akses_overstaying=?, akses_integrasi=?, akses_bebas_harian=?, akses_upt=?, akses_user=?, akses_instansi=? WHERE id=?");
-            $stmt->execute([$nama_lengkap, $no_wa, $role, $upt_id, $akses_dashboard, $akses_penghuni, $akses_overstaying, $akses_integrasi, $akses_bebas_harian, $akses_upt, $akses_user, $akses_instansi, $id]);
+            $stmt = $pdo->prepare("UPDATE users SET nama_lengkap=?, no_wa=?, role=?, upt_id=?, akses_dashboard=?, akses_penghuni=?, akses_overstaying=?, akses_integrasi=?, akses_bebas_harian=?, akses_upt=?, akses_user=?, akses_instansi=?, akses_activity_log=? WHERE id=?");
+            $stmt->execute([$nama_lengkap, $no_wa, $role, $upt_id, $akses_dashboard, $akses_penghuni, $akses_overstaying, $akses_integrasi, $akses_bebas_harian, $akses_upt, $akses_user, $akses_instansi, $akses_activity_log, $id]);
         }
         
         $message = 'User berhasil diperbarui.';
@@ -241,6 +243,9 @@ $users = $stmt->fetchAll();
                     <a href="instansi.php"><i class="fas fa-cog"></i><span>Pengaturan Instansi</span></a>
                     <?php endif; ?>
                     <a href="pengumuman.php"><i class="fas fa-bullhorn"></i><span>Pengumuman</span></a>
+                    <?php if (hasAccess('activity_log')): ?>
+                    <a href="activity-log.php"><i class="fas fa-history"></i><span>Activity Log</span></a>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php if (hasAccess('wa_settings') || hasAccess('wa_schedule')): ?>
@@ -356,6 +361,7 @@ $users = $stmt->fetchAll();
                                 if ($u['akses_upt']) $akses[] = 'UPT';
                                 if ($u['akses_user']) $akses[] = 'User';
                                 if ($u['akses_instansi']) $akses[] = 'Instansi';
+                                if (!empty($u['akses_activity_log'])) $akses[] = 'Activity Log';
                                 echo !empty($akses) ? implode(', ', $akses) : '-';
                                 ?>
                             </td>
@@ -486,6 +492,12 @@ $users = $stmt->fetchAll();
                                         <label class="form-check-label" for="add_instansi">Pengaturan Instansi</label>
                                     </div>
                                 </div>
+                                <div class="col-6 col-md-4 access-checkbox">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="akses_activity_log" value="1" class="form-check-input" id="add_activity_log">
+                                        <label class="form-check-label" for="add_activity_log">Activity Log</label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -603,6 +615,12 @@ $users = $stmt->fetchAll();
                                         <label class="form-check-label" for="edit_instansi">Pengaturan Instansi</label>
                                     </div>
                                 </div>
+                                <div class="col-6 col-md-4 access-checkbox">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="akses_activity_log" value="1" class="form-check-input" id="edit_activity_log">
+                                        <label class="form-check-label" for="edit_activity_log">Activity Log</label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -657,6 +675,7 @@ $users = $stmt->fetchAll();
             document.getElementById('edit_upt_menu').checked = data.akses_upt == 1;
             document.getElementById('edit_user').checked = data.akses_user == 1;
             document.getElementById('edit_instansi').checked = data.akses_instansi == 1;
+            document.getElementById('edit_activity_log').checked = data.akses_activity_log == 1;
             
             new bootstrap.Modal(document.getElementById('modalEdit')).show();
         }
