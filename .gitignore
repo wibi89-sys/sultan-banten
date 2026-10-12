@@ -3,6 +3,7 @@ scratch/
 .DS_Store
 Thumbs.db
 config/database.php
+includes/database.php
 uploads/
 upload/
 laravel/
