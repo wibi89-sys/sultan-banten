@@ -659,6 +659,39 @@ function initDatabase($pdo) {
             $pdo->exec("ALTER TABLE instansi ADD COLUMN welcome_banner VARCHAR(255) DEFAULT NULL AFTER running_text");
         }
     } catch (Exception $e) {}
+
+    // Add akses_bebas_harian column to users table if not exists
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM users LIKE 'akses_bebas_harian'");
+        if (!$stmt->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN akses_bebas_harian TINYINT(1) DEFAULT 0 AFTER akses_integrasi");
+            $pdo->exec("UPDATE users SET akses_bebas_harian = 1 WHERE role = 'admin'");
+        }
+    } catch (Exception $e) {}
+
+    // Create Table data_bebas_harian if not exists
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS data_bebas_harian (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            upt_id INT NOT NULL,
+            tanggal DATE NOT NULL,
+            klasifikasi_pidana ENUM('Pidana Umum', 'Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida', 'UU ITE') NOT NULL,
+            bebas_murni INT DEFAULT 0,
+            pb INT DEFAULT 0,
+            cb INT DEFAULT 0,
+            cmb INT DEFAULT 0,
+            asimilasi INT DEFAULT 0,
+            bdh INT DEFAULT 0,
+            lainnya INT DEFAULT 0,
+            ket_lainnya VARCHAR(255) DEFAULT NULL,
+            keterangan TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_bebas_upt_tgl (upt_id, tanggal),
+            INDEX idx_bebas_tgl (tanggal),
+            INDEX idx_bebas_klasifikasi (klasifikasi_pidana)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Exception $e) {}
 }
 
 // Function to add missing indexes for query performance
@@ -695,4 +728,37 @@ if (!file_exists($lockFile)) {
     initDatabase($pdo);
     optimizeDatabaseIndexes($pdo);
     @file_put_contents($lockFile, 'Database checked and initialized on ' . date('Y-m-d H:i:s'));
+} else {
+    // Incremental checks for newer features (e.g. data_bebas_harian)
+    try {
+        $stmtCol = $pdo->query("SHOW COLUMNS FROM users LIKE 'akses_bebas_harian'");
+        if (!$stmtCol || !$stmtCol->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN akses_bebas_harian TINYINT(1) DEFAULT 0 AFTER akses_integrasi");
+            $pdo->exec("UPDATE users SET akses_bebas_harian = 1 WHERE role = 'admin'");
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS data_bebas_harian (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            upt_id INT NOT NULL,
+            tanggal DATE NOT NULL,
+            klasifikasi_pidana ENUM('Pidana Umum', 'Tipikor', 'Narkoba Bandar', 'Narkoba Pengguna', 'Teroris', 'Trafficking', 'Ilegal Logging', 'Money Laundering', 'Genosida', 'UU ITE') NOT NULL,
+            bebas_murni INT DEFAULT 0,
+            pb INT DEFAULT 0,
+            cb INT DEFAULT 0,
+            cmb INT DEFAULT 0,
+            asimilasi INT DEFAULT 0,
+            bdh INT DEFAULT 0,
+            lainnya INT DEFAULT 0,
+            ket_lainnya VARCHAR(255) DEFAULT NULL,
+            keterangan TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_bebas_upt_tgl (upt_id, tanggal),
+            INDEX idx_bebas_tgl (tanggal),
+            INDEX idx_bebas_klasifikasi (klasifikasi_pidana)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Exception $e) {}
 }
+

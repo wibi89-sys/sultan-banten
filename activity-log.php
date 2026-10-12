@@ -189,7 +189,7 @@ $modulLabels = [
         <div class="sidebar-menu">
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
             
-            <?php if (hasAccess('penghuni') || hasAccess('overstaying') || hasAccess('integrasi')): ?>
+            <?php if (hasAccess('penghuni') || hasAccess('overstaying') || hasAccess('integrasi') || hasAccess('bebas_harian')): ?>
             <div class="menu-parent collapsed" data-bs-toggle="collapse" data-bs-target="#menuInputData">
                 <i class="fas fa-edit"></i>
                 <span>Input Data</span>
@@ -205,6 +205,9 @@ $modulLabels = [
                     <?php endif; ?>
                     <?php if (hasAccess('integrasi')): ?>
                     <a href="integrasi.php"><i class="fas fa-exchange-alt"></i><span>Data Integrasi</span></a>
+                    <?php endif; ?>
+                    <?php if (hasAccess('bebas_harian')): ?>
+                    <a href="bebas_harian.php"><i class="fas fa-door-open"></i><span>Bebas Harian</span></a>
                     <?php endif; ?>
                     <a href="kroscek.php"><i class="fas fa-check-double"></i><span>Kroscek Data</span></a>
                 </div>
@@ -222,6 +225,7 @@ $modulLabels = [
                     <a href="laporan.php?type=penghuni"><i class="fas fa-users"></i><span>Lap. Penghuni</span></a>
                     <a href="laporan.php?type=overstaying"><i class="fas fa-clock"></i><span>Lap. Overstaying</span></a>
                     <a href="laporan.php?type=integrasi"><i class="fas fa-exchange-alt"></i><span>Lap. Integrasi</span></a>
+                    <a href="laporan.php?type=bebas_harian"><i class="fas fa-door-open"></i><span>Lap. Bebas Harian</span></a>
                     <a href="laporan.php?type=rekapitulasi"><i class="fas fa-chart-bar"></i><span>Rekapitulasi</span></a>
                 </div>
             </div>
@@ -536,7 +540,7 @@ $modulLabels = [
         
         <!-- Footer -->
         <footer class="text-center py-3 mt-auto" style="color: var(--text-secondary); font-size: 12px;">
-            © Ditjenpas Banten 2026
+            Â© Ditjenpas Banten 2026
         </footer>
     </div>
     
@@ -561,3 +565,4 @@ $modulLabels = [
     </script>
 </body>
 </html>
+

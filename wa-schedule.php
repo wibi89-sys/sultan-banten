@@ -257,7 +257,7 @@ $hariOptions = [
         <div class="sidebar-menu">
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
             
-            <?php if (hasAccess('penghuni') || hasAccess('overstaying') || hasAccess('integrasi')): ?>
+            <?php if (hasAccess('penghuni') || hasAccess('overstaying') || hasAccess('integrasi') || hasAccess('bebas_harian')): ?>
             <div class="menu-parent collapsed" data-bs-toggle="collapse" data-bs-target="#menuInputData">
                 <i class="fas fa-edit"></i>
                 <span>Input Data</span>
@@ -273,6 +273,9 @@ $hariOptions = [
                     <?php endif; ?>
                     <?php if (hasAccess('integrasi')): ?>
                     <a href="integrasi.php"><i class="fas fa-exchange-alt"></i><span>Data Integrasi</span></a>
+                    <?php endif; ?>
+                    <?php if (hasAccess('bebas_harian')): ?>
+                    <a href="bebas_harian.php"><i class="fas fa-door-open"></i><span>Bebas Harian</span></a>
                     <?php endif; ?>
                     <a href="kroscek.php"><i class="fas fa-check-double"></i><span>Kroscek Data</span></a>
                 </div>
@@ -290,6 +293,7 @@ $hariOptions = [
                     <a href="laporan.php?type=penghuni"><i class="fas fa-users"></i><span>Lap. Penghuni</span></a>
                     <a href="laporan.php?type=overstaying"><i class="fas fa-clock"></i><span>Lap. Overstaying</span></a>
                     <a href="laporan.php?type=integrasi"><i class="fas fa-exchange-alt"></i><span>Lap. Integrasi</span></a>
+                    <a href="laporan.php?type=bebas_harian"><i class="fas fa-door-open"></i><span>Lap. Bebas Harian</span></a>
                     <a href="laporan.php?type=rekapitulasi"><i class="fas fa-chart-bar"></i><span>Rekapitulasi</span></a>
                 </div>
             </div>
@@ -392,6 +396,7 @@ $hariOptions = [
                         'Kategori Lainnya' => ['wna', 'lansia', 'sakit', 'uu_ite', 'pidana_mati', 'seumur_hidup'],
                         'Overstaying' => ['overstaying_ai', 'overstaying_aii', 'overstaying_aiii', 'overstaying_aiv', 'overstaying_av', 'total_overstaying'],
                         'Integrasi' => ['sk_pb', 'sk_cb', 'sk_cmb', 'sk_asimilasi', 'total_sk'],
+                        'Bebas Harian' => ['bebas_murni', 'bebas_pb', 'bebas_cb', 'bebas_cmb', 'bebas_asimilasi', 'bebas_bdh', 'bebas_lainnya', 'total_bebas'],
                     ];
                     
                     foreach ($categories as $catName => $vars):

@@ -31,6 +31,7 @@ $reportTitles = [
     'penghuni' => 'Laporan Data Penghuni',
     'overstaying' => 'Laporan Data Overstaying',
     'integrasi' => 'Laporan Data Integrasi',
+    'bebas_harian' => 'Laporan Data Bebas Harian',
     'rekapitulasi' => 'Laporan Rekapitulasi'
 ];
 
@@ -56,6 +57,20 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
     
     try {
         switch ($type) {
+            case 'bebas_harian':
+                $sql = "SELECT 
+                        dbh.*, u.nama_upt 
+                        FROM data_bebas_harian dbh
+                        JOIN upt u ON dbh.upt_id = u.id
+                        WHERE 1=1 " . str_replace("AND upt_id", "AND dbh.upt_id", $uptClause) . " " . str_replace("AND tanggal", "AND dbh.tanggal", $dateClause) . "
+                        ORDER BY dbh.tanggal DESC, u.nama_upt ASC, dbh.id ASC";
+                $params = [];
+                if ($uptId) $params[] = $uptId;
+                $params = array_merge($params, $dateParams);
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $data = $stmt->fetchAll();
+                break;
             case 'penghuni':
                 // Custom query for per-date report exactly like PDF
                 $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
@@ -431,6 +446,77 @@ switch ($reportType) {
         echo '<td colspan="13" align="center" bgcolor="#34495e" style="color: white; font-weight: bold;">TOTAL</td>';
         echo '<td align="center" bgcolor="#34495e" style="color: white; font-weight: bold;">' . $grandTotal . '</td>';
         echo '<td bgcolor="#34495e" style="color: white; font-weight: bold;"></td>';
+        echo '</tr>';
+        break;
+
+    case 'bebas_harian':
+        echo '<tr>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>No</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Tanggal</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>UPT</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Klasifikasi Pidana</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Bebas Murni</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>PB</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>CB</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>CMB</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Asimilasi</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>BDH</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Lainnya</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Rincian Lainnya</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Total</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Catatan</b></td>';
+        echo '<td align="center" bgcolor="#34495e" style="color: white;"><b>Waktu Input</b></td>';
+        echo '</tr>';
+
+        $no = 1;
+        $totBm = 0; $totPb = 0; $totCb = 0; $totCmb = 0; $totAsim = 0; $totBdh = 0; $totLain = 0; $grandTotal = 0;
+
+        foreach ($data as $row) {
+            $bm = (int)($row['bebas_murni'] ?? 0);
+            $pb = (int)($row['pb'] ?? 0);
+            $cb = (int)($row['cb'] ?? 0);
+            $cmb = (int)($row['cmb'] ?? 0);
+            $asim = (int)($row['asimilasi'] ?? 0);
+            $bdh = (int)($row['bdh'] ?? 0);
+            $lain = (int)($row['lainnya'] ?? 0);
+            $subTotal = $bm + $pb + $cb + $cmb + $asim + $bdh + $lain;
+
+            $totBm += $bm; $totPb += $pb; $totCb += $cb; $totCmb += $cmb; $totAsim += $asim; $totBdh += $bdh; $totLain += $lain;
+            $grandTotal += $subTotal;
+
+            echo '<tr>';
+            echo '<td align="center">' . $no++ . '</td>';
+            $tanggalVal = !empty($row['tanggal']) ? date('d/m/Y', strtotime($row['tanggal'])) : '-';
+            echo '<td align="center">' . $tanggalVal . '</td>';
+            echo '<td>' . htmlspecialchars($row['nama_upt'] ?? '-') . '</td>';
+            echo '<td>' . htmlspecialchars($row['klasifikasi_pidana'] ?? '-') . '</td>';
+            echo '<td align="center">' . $bm . '</td>';
+            echo '<td align="center">' . $pb . '</td>';
+            echo '<td align="center">' . $cb . '</td>';
+            echo '<td align="center">' . $cmb . '</td>';
+            echo '<td align="center">' . $asim . '</td>';
+            echo '<td align="center">' . $bdh . '</td>';
+            echo '<td align="center">' . $lain . '</td>';
+            echo '<td>' . htmlspecialchars($row['ket_lainnya'] ?? '-') . '</td>';
+            echo '<td align="center"><b>' . $subTotal . '</b></td>';
+            echo '<td>' . htmlspecialchars($row['keterangan'] ?? '-') . '</td>';
+            $waktuInput = isset($row['created_at']) ? date('d/m/Y H:i:s', strtotime($row['created_at'])) : '-';
+            echo '<td align="center">' . $waktuInput . '</td>';
+            echo '</tr>';
+        }
+
+        echo '<tr bgcolor="#34495e" style="color: white; font-weight: bold;">';
+        echo '<td colspan="4" align="center">TOTAL</td>';
+        echo '<td align="center">' . $totBm . '</td>';
+        echo '<td align="center">' . $totPb . '</td>';
+        echo '<td align="center">' . $totCb . '</td>';
+        echo '<td align="center">' . $totCmb . '</td>';
+        echo '<td align="center">' . $totAsim . '</td>';
+        echo '<td align="center">' . $totBdh . '</td>';
+        echo '<td align="center">' . $totLain . '</td>';
+        echo '<td></td>';
+        echo '<td align="center">' . $grandTotal . '</td>';
+        echo '<td colspan="2"></td>';
         echo '</tr>';
         break;
         

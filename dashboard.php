@@ -43,9 +43,11 @@ if ($filter_upt > 0) {
             SELECT DISTINCT upt_id FROM data_overstaying WHERE tanggal = ? AND upt_id = ?
             UNION
             SELECT DISTINCT upt_id FROM data_integrasi WHERE tanggal = ? AND upt_id = ?
+            UNION
+            SELECT DISTINCT upt_id FROM data_bebas_harian WHERE tanggal = ? AND upt_id = ?
         ) as combined
     ");
-    $stmt->execute([$filter_tanggal, $filter_upt, $filter_tanggal, $filter_upt, $filter_tanggal, $filter_upt]);
+    $stmt->execute([$filter_tanggal, $filter_upt, $filter_tanggal, $filter_upt, $filter_tanggal, $filter_upt, $filter_tanggal, $filter_upt]);
     $totalUPTWithData = $stmt->fetch()['total'] > 0 ? 1 : 0;
 } else {
     // Hitung jumlah UPT yang memiliki data pada tanggal tersebut (dari semua tabel)
@@ -56,9 +58,11 @@ if ($filter_upt > 0) {
             SELECT DISTINCT upt_id FROM data_overstaying WHERE tanggal = ?
             UNION
             SELECT DISTINCT upt_id FROM data_integrasi WHERE tanggal = ?
+            UNION
+            SELECT DISTINCT upt_id FROM data_bebas_harian WHERE tanggal = ?
         ) as combined
     ");
-    $stmt->execute([$filter_tanggal, $filter_tanggal, $filter_tanggal]);
+    $stmt->execute([$filter_tanggal, $filter_tanggal, $filter_tanggal, $filter_tanggal]);
     $totalUPTWithData = $stmt->fetch()['total'] ?? 0;
 }
 
@@ -94,9 +98,11 @@ if ($filter_upt > 0) {
             SELECT DISTINCT upt_id FROM data_overstaying WHERE tanggal = ?
             UNION
             SELECT DISTINCT upt_id FROM data_integrasi WHERE tanggal = ?
+            UNION
+            SELECT DISTINCT upt_id FROM data_bebas_harian WHERE tanggal = ?
         )
     ");
-    $stmt->execute([$filter_tanggal, $filter_tanggal, $filter_tanggal]);
+    $stmt->execute([$filter_tanggal, $filter_tanggal, $filter_tanggal, $filter_tanggal]);
     $stats['total_kapasitas'] = $stmt->fetch()['total'] ?? 0;
 }
 
@@ -182,6 +188,41 @@ $stmt = $pdo->prepare("SELECT
     FROM data_integrasi $whereClause");
 $stmt->execute($params);
 $stats['total_integrasi'] = $stmt->fetch()['total'] ?? 0;
+
+// Get bebas harian stats
+$stats['bebas_murni'] = 0;
+$stats['bebas_pb'] = 0;
+$stats['bebas_cb'] = 0;
+$stats['bebas_cmb'] = 0;
+$stats['bebas_asimilasi'] = 0;
+$stats['bebas_bdh'] = 0;
+$stats['bebas_lainnya'] = 0;
+$stats['total_bebas'] = 0;
+
+try {
+    $stmtBebas = $pdo->prepare("SELECT 
+        SUM(bebas_murni) as bm,
+        SUM(pb) as pb,
+        SUM(cb) as cb,
+        SUM(cmb) as cmb,
+        SUM(asimilasi) as asim,
+        SUM(bdh) as bdh,
+        SUM(lainnya) as lny,
+        SUM(bebas_murni + pb + cb + cmb + asimilasi + bdh + lainnya) as total
+        FROM data_bebas_harian $whereClause");
+    $stmtBebas->execute($params);
+    $bebasRes = $stmtBebas->fetch();
+    if ($bebasRes) {
+        $stats['bebas_murni'] = (int)($bebasRes['bm'] ?? 0);
+        $stats['bebas_pb'] = (int)($bebasRes['pb'] ?? 0);
+        $stats['bebas_cb'] = (int)($bebasRes['cb'] ?? 0);
+        $stats['bebas_cmb'] = (int)($bebasRes['cmb'] ?? 0);
+        $stats['bebas_asimilasi'] = (int)($bebasRes['asim'] ?? 0);
+        $stats['bebas_bdh'] = (int)($bebasRes['bdh'] ?? 0);
+        $stats['bebas_lainnya'] = (int)($bebasRes['lny'] ?? 0);
+        $stats['total_bebas'] = (int)($bebasRes['total'] ?? 0);
+    }
+} catch (Exception $e) {}
 
 // Get overstaying stats per kategori (AI-AV) for donut chart
 // Sesuai dengan filter tanggal
@@ -357,6 +398,30 @@ $pmshQuery = "SELECT
 $stmtPmsh = $pdo->prepare($pmshQuery);
 $stmtPmsh->execute($jenisKejahatanParams);
 $pmshData = $stmtPmsh->fetchAll();
+
+// Get data for "Tabel Bebas Harian per UPT"
+$bebasHarianUptQuery = "SELECT 
+    u.id, u.nama_upt,
+    COALESCE(SUM(dbh.bebas_murni), 0) as bebas_murni,
+    COALESCE(SUM(dbh.pb), 0) as pb,
+    COALESCE(SUM(dbh.cb), 0) as cb,
+    COALESCE(SUM(dbh.cmb), 0) as cmb,
+    COALESCE(SUM(dbh.asimilasi), 0) as asimilasi,
+    COALESCE(SUM(dbh.bdh), 0) as bdh,
+    COALESCE(SUM(dbh.lainnya), 0) as lainnya,
+    COALESCE(SUM(dbh.bebas_murni + dbh.pb + dbh.cb + dbh.cmb + dbh.asimilasi + dbh.bdh + dbh.lainnya), 0) as total_bebas
+    FROM upt u
+    LEFT JOIN data_bebas_harian dbh ON u.id = dbh.upt_id AND dbh.tanggal = ?
+    " . ($filter_upt > 0 ? "WHERE u.id = ?" : "") . "
+    GROUP BY u.id, u.nama_upt
+    ORDER BY u.nama_upt";
+
+$bebasHarianUptData = [];
+try {
+    $stmtBebasHarianUpt = $pdo->prepare($bebasHarianUptQuery);
+    $stmtBebasHarianUpt->execute($jenisKejahatanParams);
+    $bebasHarianUptData = $stmtBebasHarianUpt->fetchAll();
+} catch (Exception $e) {}
 
 // Get data for "Data Penghuni Berdasarkan Umur dan Jenis Kelamin" chart
 // Sesuai dengan filter tanggal dan UPT (menggunakan pola yang sama dengan Total Penghuni)
@@ -923,8 +988,15 @@ function getOverkapasitasColor($persen) {
             background-color: white;
         }
 
+        /* Content Wrapper Spacing */
+        .content-wrapper {
+            padding: 20px 24px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
         .main-content.no-sidebar .content-wrapper {
-            padding: 15px;
+            padding: 20px 24px;
             animation: fadeInUp 0.5s ease-out 0.3s both;
         }
 
@@ -933,6 +1005,24 @@ function getOverkapasitasColor($persen) {
         .main-content.no-sidebar .table-card,
         .main-content.no-sidebar .detail-card {
             border-radius: 12px;
+        }
+
+        @media (max-width: 991.98px) {
+            .content-wrapper {
+                padding: 16px 18px;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .content-wrapper {
+                padding: 12px 14px;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .content-wrapper {
+                padding: 8px 10px;
+            }
         }
 
         /* Animations */
@@ -1262,7 +1352,7 @@ function getOverkapasitasColor($persen) {
         }
         
         @media (max-width: 575.98px) {
-            .main-content { padding: 8px; }
+            .main-content { padding: 0 !important; }
             .stat-card { padding: 10px; margin-bottom: 6px; }
             .stat-card .stat-value { font-size: 16px; }
             .stat-card .stat-label { font-size: 10px; }
@@ -1326,6 +1416,9 @@ function getOverkapasitasColor($persen) {
                     <?php if (hasAccess('integrasi')): ?>
                     <a href="integrasi.php"><i class="fas fa-exchange-alt"></i><span>Data Integrasi</span></a>
                     <?php endif; ?>
+                    <?php if (hasAccess('bebas_harian')): ?>
+                    <a href="bebas_harian.php"><i class="fas fa-door-open"></i><span>Bebas Harian</span></a>
+                    <?php endif; ?>
                     <a href="kroscek.php"><i class="fas fa-check-double"></i><span>Kroscek Data</span></a>
                 </div>
             </div>
@@ -1342,6 +1435,7 @@ function getOverkapasitasColor($persen) {
                     <a href="laporan.php?type=penghuni"><i class="fas fa-users"></i><span>Lap. Penghuni</span></a>
                     <a href="laporan.php?type=overstaying"><i class="fas fa-clock"></i><span>Lap. Overstaying</span></a>
                     <a href="laporan.php?type=integrasi"><i class="fas fa-exchange-alt"></i><span>Lap. Integrasi</span></a>
+                    <a href="laporan.php?type=bebas_harian"><i class="fas fa-door-open"></i><span>Lap. Bebas Harian</span></a>
                     <a href="laporan.php?type=rekapitulasi"><i class="fas fa-chart-bar"></i><span>Rekapitulasi</span></a>
                 </div>
             </div>
@@ -1458,9 +1552,7 @@ function getOverkapasitasColor($persen) {
         }
         ?>
 
-        <?php if (!$user): ?>
         <div class="content-wrapper">
-        <?php endif; ?>
 
         <!-- Filter Card -->
         <div class="filter-card">
@@ -1683,6 +1775,90 @@ function getOverkapasitasColor($persen) {
             </div>
         </div>
 
+        <!-- Bebas Harian Statistics Cards -->
+        <div class="section-header" style="border-bottom: 2px solid #10b981; color: #10b981;">
+            <i class="fas fa-door-open me-1"></i>Pengeluaran / Bebas Harian
+        </div>
+        <div class="row mb-3 g-2">
+            <div class="col-6 col-md-3 col-xl">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #6b7280;">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-secondary text-white me-2"><i class="fas fa-check-circle"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm"><?= number_format($stats['bebas_murni'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">Bebas Murni</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-xl">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #3b82f6;">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-primary text-white me-2"><i class="fas fa-user-check"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm text-primary"><?= number_format($stats['bebas_pb'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">PB (Bersyarat)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-xl">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #06b6d4;">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-info text-white me-2"><i class="fas fa-calendar-check"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm text-info"><?= number_format($stats['bebas_cb'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">CB (Cuti Bersyarat)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-xl">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #f59e0b;">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-warning text-dark me-2"><i class="fas fa-hourglass-end"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm text-warning"><?= number_format($stats['bebas_cmb'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">CMB</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-xl">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #10b981;">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-success text-white me-2"><i class="fas fa-home"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm text-success"><?= number_format($stats['bebas_asimilasi'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">Asimilasi</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-xl">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #ef4444;">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm bg-danger text-white me-2"><i class="fas fa-balance-scale"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm text-danger"><?= number_format($stats['bebas_bdh'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">BDH (Demi Hukum)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 col-xl">
+                <div class="stat-card stat-card-sm h-100" style="border-left: 4px solid #8b5cf6;">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon-sm text-white me-2" style="background: #8b5cf6;"><i class="fas fa-flag-checkered"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="stat-value-sm fw-bold" style="color: #8b5cf6;"><?= number_format($stats['total_bebas'], 0, ',', '.') ?></div>
+                            <p class="stat-label-sm">Total Bebas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Peta Lokasi UPT -->
         <div class="chart-card">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
@@ -1701,7 +1877,12 @@ function getOverkapasitasColor($persen) {
 
         <!-- Overkapasitas Table -->
         <div class="table-card">
-            <h5 class="mb-2"><i class="fas fa-chart-bar me-2"></i>Data Penghuni & Overkapasitas per UPT</h5>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Data Penghuni & Overkapasitas per UPT</h5>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle">
+                    <i class="fas fa-calendar-day me-1"></i><?= formatIndonesianDate($filter_tanggal, false) ?>
+                </span>
+            </div>
             
             <!-- Legend -->
             <div class="mb-2" style="font-size: 10px;">
@@ -1793,7 +1974,12 @@ function getOverkapasitasColor($persen) {
 
         <!-- Tabel Data Penghuni Berdasarkan Jenis Kejahatan -->
         <div class="table-card">
-            <h5 class="mb-2"><i class="fas fa-table me-2"></i>Data Penghuni Berdasarkan Jenis Kejahatan per UPT</h5>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0"><i class="fas fa-table me-2"></i>Data Penghuni Berdasarkan Jenis Kejahatan per UPT</h5>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle">
+                    <i class="fas fa-calendar-day me-1"></i><?= formatIndonesianDate($filter_tanggal, false) ?>
+                </span>
+            </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover table-sm mb-0" style="font-size: 10px;">
                     <thead class="table-light">
@@ -1967,7 +2153,12 @@ function getOverkapasitasColor($persen) {
 
         <!-- Tabel Pidana Mati dan Seumur Hidup per UPT -->
         <div class="table-card mt-3">
-            <h5 class="mb-2 text-danger"><i class="fas fa-skull-crossbones me-2"></i>Data Pidana Mati dan Seumur Hidup per UPT</h5>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0 text-danger"><i class="fas fa-skull-crossbones me-2"></i>Data Pidana Mati dan Seumur Hidup per UPT</h5>
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">
+                    <i class="fas fa-calendar-day me-1"></i><?= formatIndonesianDate($filter_tanggal, false) ?>
+                </span>
+            </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover table-sm mb-0" style="font-size: 11px;">
                     <thead class="table-light">
@@ -2009,6 +2200,101 @@ function getOverkapasitasColor($persen) {
                         </tr>
                     </tfoot>
                 </table>
+            </div>
+        </div>
+
+        <!-- Tabel Bebas Harian per UPT -->
+        <div class="table-card mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0 text-success"><i class="fas fa-door-open me-2"></i>Data Pengeluaran / Bebas Harian per UPT</h5>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle">
+                    <i class="fas fa-calendar-day me-1"></i><?= formatIndonesianDate($filter_tanggal, false) ?>
+                </span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm mb-0" style="font-size: 11px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center align-middle py-2" style="width: 40px;">No</th>
+                            <th class="align-middle py-2" style="min-width: 170px;">Unit Pelaksana Teknis</th>
+                            <th class="text-center py-2" style="width: 95px; background-color: rgba(107, 114, 128, 0.08);">Bebas Murni</th>
+                            <th class="text-center py-2" style="width: 95px; background-color: rgba(59, 130, 246, 0.08); color: #1d4ed8;">PB</th>
+                            <th class="text-center py-2" style="width: 95px; background-color: rgba(6, 182, 212, 0.08); color: #0891b2;">CB</th>
+                            <th class="text-center py-2" style="width: 95px; background-color: rgba(139, 92, 246, 0.08); color: #7c3aed;">CMB</th>
+                            <th class="text-center py-2" style="width: 95px; background-color: rgba(245, 158, 11, 0.08); color: #b45309;">Asimilasi</th>
+                            <th class="text-center py-2" style="width: 95px; background-color: rgba(239, 68, 68, 0.08); color: #b91c1c;">BDH</th>
+                            <th class="text-center py-2" style="width: 95px; background-color: rgba(100, 116, 139, 0.08); color: #475569;">Lainnya</th>
+                            <th class="text-center py-2" style="width: 100px; background-color: rgba(16, 185, 129, 0.15); color: #047857;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $noBebas = 1;
+                        $totBM = 0;
+                        $totPB = 0;
+                        $totCB = 0;
+                        $totCMB = 0;
+                        $totAsim = 0;
+                        $totBDH = 0;
+                        $totLny = 0;
+                        $totSemua = 0;
+                        foreach ($bebasHarianUptData as $rowBebas): 
+                            $bm = (int)$rowBebas['bebas_murni'];
+                            $pb = (int)$rowBebas['pb'];
+                            $cb = (int)$rowBebas['cb'];
+                            $cmb = (int)$rowBebas['cmb'];
+                            $asim = (int)$rowBebas['asimilasi'];
+                            $bdh = (int)$rowBebas['bdh'];
+                            $lny = (int)$rowBebas['lainnya'];
+                            $totalUpt = $bm + $pb + $cb + $cmb + $asim + $bdh + $lny;
+                            
+                            $totBM += $bm;
+                            $totPB += $pb;
+                            $totCB += $cb;
+                            $totCMB += $cmb;
+                            $totAsim += $asim;
+                            $totBDH += $bdh;
+                            $totLny += $lny;
+                            $totSemua += $totalUpt;
+                        ?>
+                        <tr>
+                            <td class="text-center py-2"><?= $noBebas++ ?></td>
+                            <td class="py-2 fw-medium"><?= htmlspecialchars($rowBebas['nama_upt']) ?></td>
+                            <td class="text-center py-2 <?= $bm > 0 ? 'fw-bold' : 'text-muted' ?>"><?= number_format($bm) ?></td>
+                            <td class="text-center py-2 <?= $pb > 0 ? 'fw-bold text-primary' : 'text-muted' ?>"><?= number_format($pb) ?></td>
+                            <td class="text-center py-2 <?= $cb > 0 ? 'fw-bold text-info' : 'text-muted' ?>"><?= number_format($cb) ?></td>
+                            <td class="text-center py-2 <?= $cmb > 0 ? 'fw-bold' : 'text-muted' ?>" style="<?= $cmb > 0 ? 'color: #7c3aed;' : '' ?>"><?= number_format($cmb) ?></td>
+                            <td class="text-center py-2 <?= $asim > 0 ? 'fw-bold text-warning-emphasis' : 'text-muted' ?>"><?= number_format($asim) ?></td>
+                            <td class="text-center py-2 <?= $bdh > 0 ? 'fw-bold text-danger' : 'text-muted' ?>"><?= number_format($bdh) ?></td>
+                            <td class="text-center py-2 <?= $lny > 0 ? 'fw-bold text-secondary' : 'text-muted' ?>"><?= number_format($lny) ?></td>
+                            <td class="text-center py-2 fw-bold text-success" style="background-color: rgba(16, 185, 129, 0.05);"><?= number_format($totalUpt) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($bebasHarianUptData)): ?>
+                        <tr><td colspan="10" class="text-center text-muted py-3">Belum ada data pengeluaran / bebas harian</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr class="fw-bold">
+                            <td colspan="2" class="text-end py-2">TOTAL</td>
+                            <td class="text-center py-2" style="background-color: rgba(107, 114, 128, 0.08);"><?= number_format($totBM) ?></td>
+                            <td class="text-center py-2 text-primary" style="background-color: rgba(59, 130, 246, 0.08);"><?= number_format($totPB) ?></td>
+                            <td class="text-center py-2 text-info" style="background-color: rgba(6, 182, 212, 0.08);"><?= number_format($totCB) ?></td>
+                            <td class="text-center py-2" style="background-color: rgba(139, 92, 246, 0.08); color: #7c3aed;"><?= number_format($totCMB) ?></td>
+                            <td class="text-center py-2 text-warning-emphasis" style="background-color: rgba(245, 158, 11, 0.08);"><?= number_format($totAsim) ?></td>
+                            <td class="text-center py-2 text-danger" style="background-color: rgba(239, 68, 68, 0.08);"><?= number_format($totBDH) ?></td>
+                            <td class="text-center py-2 text-secondary" style="background-color: rgba(100, 116, 139, 0.08);"><?= number_format($totLny) ?></td>
+                            <td class="text-center py-2 text-success" style="background-color: rgba(16, 185, 129, 0.18); font-size: 12px;"><?= number_format($totSemua) ?></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="mt-2 text-muted d-flex flex-wrap gap-2 align-items-center" style="font-size: 10px;">
+                <i class="fas fa-info-circle"></i>
+                <span><strong>PB:</strong> Pembebasan Bersyarat</span> | 
+                <span><strong>CB:</strong> Cuti Bersyarat</span> | 
+                <span><strong>CMB:</strong> Cuti Menjelang Bebas</span> | 
+                <span><strong>BDH:</strong> Bebas Demi Hukum</span>
             </div>
         </div>
 
@@ -2093,9 +2379,7 @@ function getOverkapasitasColor($persen) {
             </div>
         </div>
 
-        <?php if (!$user): ?>
         </div><!-- content-wrapper -->
-        <?php endif; ?>
     </div>
 
     <!-- Footer -->

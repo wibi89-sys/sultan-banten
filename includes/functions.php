@@ -879,6 +879,10 @@ function sendMorningReminder() {
     $stmt = $pdo->prepare("SELECT DISTINCT upt_id FROM data_integrasi WHERE tanggal = ?");
     $stmt->execute([$today]);
     $doneIntegrasi = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt = $pdo->prepare("SELECT DISTINCT upt_id FROM data_bebas_harian WHERE tanggal = ?");
+    $stmt->execute([$today]);
+    $doneBebasHarian = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     // 2. Get time restriction
     $timeRestriction = getTimeRestriction();
@@ -905,6 +909,7 @@ function sendMorningReminder() {
         if (!in_array($uptId, $donePenghuni)) $missing[] = "Data Penghuni";
         if (!in_array($uptId, $doneOverstaying)) $missing[] = "Data Overstaying";
         if (!in_array($uptId, $doneIntegrasi)) $missing[] = "Data Integrasi";
+        if (!in_array($uptId, $doneBebasHarian)) $missing[] = "Data Bebas Harian";
         
         // 5. If everything is done, skip this operator
         if (empty($missing)) {
@@ -1001,11 +1006,16 @@ function sendAfternoonReport() {
     $stmt = $pdo->prepare("SELECT DISTINCT upt_id FROM data_integrasi WHERE tanggal = ?");
     $stmt->execute([$today]);
     $integrasiUPTs = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt = $pdo->prepare("SELECT DISTINCT upt_id FROM data_bebas_harian WHERE tanggal = ?");
+    $stmt->execute([$today]);
+    $bebasHarianUPTs = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     // Find UPTs that haven't submitted each data type
     $missingPenghuni = [];
     $missingOverstaying = [];
     $missingIntegrasi = [];
+    $missingBebasHarian = [];
     
     foreach ($allUPTs as $upt) {
         if (!in_array($upt['id'], $penghuniUPTs)) {
@@ -1017,12 +1027,15 @@ function sendAfternoonReport() {
         if (!in_array($upt['id'], $integrasiUPTs)) {
             $missingIntegrasi[] = $upt['nama_upt'];
         }
+        if (!in_array($upt['id'], $bebasHarianUPTs)) {
+            $missingBebasHarian[] = $upt['nama_upt'];
+        }
     }
     
     // Build list of missing UPTs
     $listBelumInput = "";
     
-    if (empty($missingPenghuni) && empty($missingOverstaying) && empty($missingIntegrasi)) {
+    if (empty($missingPenghuni) && empty($missingOverstaying) && empty($missingIntegrasi) && empty($missingBebasHarian)) {
         $listBelumInput = "✅ *SEMUA UPT SUDAH MENGINPUT DATA LENGKAP*";
     } else {
         if (!empty($missingPenghuni)) {
@@ -1044,6 +1057,14 @@ function sendAfternoonReport() {
         if (!empty($missingIntegrasi)) {
             $listBelumInput .= "🔴 *Belum Input Data Integrasi* (" . count($missingIntegrasi) . " UPT):\n";
             foreach ($missingIntegrasi as $name) {
+                $listBelumInput .= "   • $name\n";
+            }
+            $listBelumInput .= "\n";
+        }
+
+        if (!empty($missingBebasHarian)) {
+            $listBelumInput .= "🔴 *Belum Input Data Bebas Harian* (" . count($missingBebasHarian) . " UPT):\n";
+            foreach ($missingBebasHarian as $name) {
                 $listBelumInput .= "   • $name\n";
             }
             $listBelumInput .= "\n";
@@ -1199,6 +1220,16 @@ function getTemplateVariables() {
         'sk_cmb' => 'SK Terbit Cuti Menjelang Bebas',
         'sk_asimilasi' => 'SK Terbit Asimilasi',
         'total_sk' => 'Total SK terbit',
+
+        // Bebas Harian
+        'bebas_murni' => 'Total Bebas Murni',
+        'bebas_pb' => 'Total Bebas PB',
+        'bebas_cb' => 'Total Bebas CB',
+        'bebas_cmb' => 'Total Bebas CMB',
+        'bebas_asimilasi' => 'Total Bebas Asimilasi',
+        'bebas_bdh' => 'Total Bebas Demi Hukum (BDH)',
+        'bebas_lainnya' => 'Total Bebas Lainnya',
+        'total_bebas' => 'Total Semua Bebas Hari Ini',
     ];
 }
 
@@ -1385,6 +1416,22 @@ function generateComprehensiveReport($tanggal = null, $upt_id = null) {
     $report['sk_cmb'] = (int)($intData['cmb'] ?? 0);
     $report['sk_asimilasi'] = (int)($intData['asimilasi'] ?? 0);
     $report['total_sk'] = $report['sk_pb'] + $report['sk_cb'] + $report['sk_cmb'] + $report['sk_asimilasi'];
+
+    // Bebas Harian data
+    $sql = "SELECT SUM(bebas_murni) as bm, SUM(pb) as pb, SUM(cb) as cb, SUM(cmb) as cmb, SUM(asimilasi) as asim, SUM(bdh) as bdh, SUM(lainnya) as lny
+        FROM data_bebas_harian WHERE tanggal = ?";
+    $params = [$tanggal];
+    if ($upt_id) { $sql .= " AND upt_id = ?"; $params[] = $upt_id; }
+    $stmt = $pdo->prepare($sql); $stmt->execute($params);
+    $bebasData = $stmt->fetch();
+    $report['bebas_murni'] = (int)($bebasData['bm'] ?? 0);
+    $report['bebas_pb'] = (int)($bebasData['pb'] ?? 0);
+    $report['bebas_cb'] = (int)($bebasData['cb'] ?? 0);
+    $report['bebas_cmb'] = (int)($bebasData['cmb'] ?? 0);
+    $report['bebas_asimilasi'] = (int)($bebasData['asim'] ?? 0);
+    $report['bebas_bdh'] = (int)($bebasData['bdh'] ?? 0);
+    $report['bebas_lainnya'] = (int)($bebasData['lny'] ?? 0);
+    $report['total_bebas'] = $report['bebas_murni'] + $report['bebas_pb'] + $report['bebas_cb'] + $report['bebas_cmb'] + $report['bebas_asimilasi'] + $report['bebas_bdh'] + $report['bebas_lainnya'];
     
     // Format tanggal (Indonesian Formats)
     $report['tanggal'] = formatIndonesianDate($tanggal, true);

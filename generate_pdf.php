@@ -36,6 +36,7 @@ $reportTitles = [
     'penghuni' => 'LAPORAN DATA PENGHUNI',
     'overstaying' => 'LAPORAN DATA OVERSTAYING',
     'integrasi' => 'LAPORAN DATA INTEGRASI',
+    'bebas_harian' => 'LAPORAN DATA BEBAS HARIAN',
     'rekapitulasi' => 'LAPORAN REKAPITULASI'
 ];
 
@@ -104,6 +105,39 @@ function getReportData($type, $uptId, $tanggalMulai, $tanggalAkhir) {
     
     try {
         switch ($type) {
+            case 'bebas_harian':
+                $whereClause = "1=1";
+                $params = [];
+                if ($uptId) {
+                    $whereClause .= " AND dbh.upt_id = ?";
+                    $params[] = $uptId;
+                }
+                if (!empty($dateClause)) {
+                    $cleanDateClause = preg_replace('/^AND\s+/', '', trim($dateClause));
+                    $whereClause .= " AND " . str_replace('tanggal', 'dbh.tanggal', $cleanDateClause);
+                    $params = array_merge($params, $dateParams);
+                }
+                $sql = "SELECT 
+                    u.id as upt_id, u.nama_upt, dbh.tanggal,
+                    SUM(dbh.bebas_murni) as total_bm,
+                    SUM(dbh.pb) as total_pb,
+                    SUM(dbh.cb) as total_cb,
+                    SUM(dbh.cmb) as total_cmb,
+                    SUM(dbh.asimilasi) as total_asimilasi,
+                    SUM(dbh.bdh) as total_bdh,
+                    SUM(dbh.lainnya) as total_lainnya,
+                    SUM(dbh.bebas_murni + dbh.pb + dbh.cb + dbh.cmb + dbh.asimilasi + dbh.bdh + dbh.lainnya) as total_bebas,
+                    GROUP_CONCAT(DISTINCT NULLIF(dbh.ket_lainnya, '') SEPARATOR '; ') as rincian_lainnya,
+                    MAX(dbh.keterangan) as keterangan
+                    FROM data_bebas_harian dbh
+                    JOIN upt u ON dbh.upt_id = u.id
+                    WHERE $whereClause
+                    GROUP BY u.id, u.nama_upt, dbh.tanggal
+                    ORDER BY dbh.tanggal ASC, u.nama_upt ASC";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $data = $stmt->fetchAll();
+                break;
             case 'penghuni':
                 // Custom query for per-date report
                 $excludeKlasifikasi = ['WNA', 'Sakit Berkepanjangan', 'Lansia >70 tahun', 'Pidana Mati', 'Seumur Hidup'];
@@ -687,8 +721,150 @@ function generateRekapitulasiTable($pdf, $data) {
     $pdf->Cell($widths[8], 6, number_format($grandIntegrasi), 1, 0, 'C', true);
 }
 
+// Function generateBebasHarianTable
+function generateBebasHarianTable($pdf, $data) {
+    global $tanggalMulai, $tanggalAkhir;
+    
+    $hariTanggalStr = '-';
+    if (!empty($tanggalMulai) && !empty($tanggalAkhir)) {
+        if ($tanggalMulai === $tanggalAkhir) {
+            $hariTanggalStr = function_exists('formatIndonesianDate') ? formatIndonesianDate($tanggalMulai, true) : date('d F Y', strtotime($tanggalMulai));
+        } else {
+            $hariTanggalStr = (function_exists('formatIndonesianDate') ? formatIndonesianDate($tanggalMulai, false) : date('d F Y', strtotime($tanggalMulai))) . ' s/d ' . (function_exists('formatIndonesianDate') ? formatIndonesianDate($tanggalAkhir, false) : date('d F Y', strtotime($tanggalAkhir)));
+        }
+    } elseif (!empty($tanggalMulai)) {
+        $hariTanggalStr = 'Mulai ' . (function_exists('formatIndonesianDate') ? formatIndonesianDate($tanggalMulai, false) : date('d F Y', strtotime($tanggalMulai)));
+    } elseif (!empty($tanggalAkhir)) {
+        $hariTanggalStr = 'Sampai ' . (function_exists('formatIndonesianDate') ? formatIndonesianDate($tanggalAkhir, false) : date('d F Y', strtotime($tanggalAkhir)));
+    }
+    
+    $pdf->SetFont('helvetica', '', 10);
+    $pdf->Cell(0, 5, 'Hari/Tanggal : ' . $hariTanggalStr, 0, 1, 'L');
+    $pdf->Ln(2);
+    
+    // Widths for A4 Portrait (Total 188 <= 190)
+    // No(8), UPT(42), BM(12), PB(12), CB(12), CMB(12), Asim(12), BDH(12), Lainnya(14), Total(14), Ket(40)
+    $widths = [8, 42, 12, 12, 12, 12, 12, 12, 14, 14, 40];
+    
+    $pdf->SetFont('helvetica', 'B', 7.5);
+    $pdf->SetFillColor(220, 220, 220);
+    $pdf->SetTextColor(0, 0, 0);
+    
+    // Header row
+    $pdf->Cell($widths[0], 7, 'NO', 1, 0, 'C', true);
+    $pdf->Cell($widths[1], 7, 'NAMA UPT', 1, 0, 'C', true);
+    $pdf->Cell($widths[2], 7, 'BM', 1, 0, 'C', true);
+    $pdf->Cell($widths[3], 7, 'PB', 1, 0, 'C', true);
+    $pdf->Cell($widths[4], 7, 'CB', 1, 0, 'C', true);
+    $pdf->Cell($widths[5], 7, 'CMB', 1, 0, 'C', true);
+    $pdf->Cell($widths[6], 7, 'ASIM', 1, 0, 'C', true);
+    $pdf->Cell($widths[7], 7, 'BDH', 1, 0, 'C', true);
+    $pdf->Cell($widths[8], 7, 'LAINNYA', 1, 0, 'C', true);
+    $pdf->Cell($widths[9], 7, 'TOTAL', 1, 0, 'C', true);
+    $pdf->Cell($widths[10], 7, 'KETERANGAN', 1, 1, 'C', true);
+    
+    // Data rows
+    $pdf->SetFont('helvetica', '', 7.5);
+    
+    $no = 1;
+    $totBm = 0; $totPb = 0; $totCb = 0; $totCmb = 0; $totAsim = 0; $totBdh = 0; $totLain = 0; $grandTotal = 0;
+    
+    foreach ($data as $row) {
+        $bm = (int)($row['total_bm'] ?? 0);
+        $pb = (int)($row['total_pb'] ?? 0);
+        $cb = (int)($row['total_cb'] ?? 0);
+        $cmb = (int)($row['total_cmb'] ?? 0);
+        $asim = (int)($row['total_asimilasi'] ?? 0);
+        $bdh = (int)($row['total_bdh'] ?? 0);
+        $lain = (int)($row['total_lainnya'] ?? 0);
+        $sub = (int)($row['total_bebas'] ?? 0);
+        
+        $totBm += $bm; $totPb += $pb; $totCb += $cb; $totCmb += $cmb; $totAsim += $asim; $totBdh += $bdh; $totLain += $lain;
+        $grandTotal += $sub;
+        
+        $textUPT = htmlspecialchars($row['nama_upt'] ?? '-');
+        $rincianLainnya = !empty($row['rincian_lainnya']) ? ' (' . $row['rincian_lainnya'] . ')' : '';
+        $ketGlobal = !empty($row['keterangan']) ? $row['keterangan'] : '';
+        $textKet = trim($ketGlobal . $rincianLainnya);
+        if (empty($textKet)) $textKet = '-';
+        
+        $numLinesUPT = $pdf->getNumLines($textUPT, $widths[1]);
+        $numLinesKet = $pdf->getNumLines($textKet, $widths[10]);
+        $maxLines = max($numLinesUPT, $numLinesKet, 1);
+        $rowH = max(6, $maxLines * 4.5);
+        
+        $pdf->Cell($widths[0], $rowH, $no++, 1, 0, 'C');
+        
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell($widths[1], $rowH, $textUPT, 1, 'L', false, 0, $x, $y, true, 0, false, true, $rowH, 'M');
+        
+        $pdf->Cell($widths[2], $rowH, $bm, 1, 0, 'C');
+        $pdf->Cell($widths[3], $rowH, $pb, 1, 0, 'C');
+        $pdf->Cell($widths[4], $rowH, $cb, 1, 0, 'C');
+        $pdf->Cell($widths[5], $rowH, $cmb, 1, 0, 'C');
+        $pdf->Cell($widths[6], $rowH, $asim, 1, 0, 'C');
+        $pdf->Cell($widths[7], $rowH, $bdh, 1, 0, 'C');
+        $pdf->Cell($widths[8], $rowH, $lain, 1, 0, 'C');
+        
+        $pdf->SetFont('helvetica', 'B', 7.5);
+        $pdf->Cell($widths[9], $rowH, $sub, 1, 0, 'C');
+        $pdf->SetFont('helvetica', '', 7.5);
+        
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $pdf->MultiCell($widths[10], $rowH, $textKet, 1, 'L', false, 1, $x, $y, true, 0, false, true, $rowH, 'M');
+    }
+    
+    // Total Row
+    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetFillColor(220, 220, 220);
+    $pdf->Cell($widths[0] + $widths[1], 6, 'TOTAL', 1, 0, 'C', true);
+    $pdf->Cell($widths[2], 6, $totBm, 1, 0, 'C', true);
+    $pdf->Cell($widths[3], 6, $totPb, 1, 0, 'C', true);
+    $pdf->Cell($widths[4], 6, $totCb, 1, 0, 'C', true);
+    $pdf->Cell($widths[5], 6, $totCmb, 1, 0, 'C', true);
+    $pdf->Cell($widths[6], 6, $totAsim, 1, 0, 'C', true);
+    $pdf->Cell($widths[7], 6, $totBdh, 1, 0, 'C', true);
+    $pdf->Cell($widths[8], 6, $totLain, 1, 0, 'C', true);
+    $pdf->Cell($widths[9], 6, $grandTotal, 1, 0, 'C', true);
+    $pdf->Cell($widths[10], 6, '', 1, 1, 'C', true);
+    
+    // Footer & Signature
+    $pdf->Ln(3);
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->Cell(0, 5, 'Demikian laporan pengeluaran / bebas harian ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
+    $pdf->Ln(5);
+    
+    $tempatTtd = $_GET['tempat_ttd'] ?? 'Serang';
+    $jabatanTtd = $_GET['jabatan_ttd'] ?? 'Kepala Bidang Pelayanan dan Pembinaan';
+    $namaTtd = $_GET['nama_ttd'] ?? 'Surya Dharma';
+    $tglTtd = function_exists('formatIndonesianDate') ? formatIndonesianDate(date('Y-m-d'), false) : date('d F Y');
+    
+    $sigX = 130;
+    $pdf->SetX($sigX);
+    $pdf->Cell(70, 5, $tempatTtd . ', ' . $tglTtd, 0, 1, 'C');
+    $pdf->SetX($sigX);
+    $pdf->Cell(70, 5, $jabatanTtd, 0, 1, 'C');
+    $pdf->Ln(2);
+    
+    $yBeforeSig = $pdf->GetY();
+    global $instansi;
+    if (!empty($instansi['ttd_image']) && file_exists(__DIR__ . '/' . $instansi['ttd_image'])) {
+        $pdf->Image(__DIR__ . '/' . $instansi['ttd_image'], $sigX + 15, $yBeforeSig - 2, 40, 0);
+    }
+    if (!empty($instansi['stempel_image']) && file_exists(__DIR__ . '/' . $instansi['stempel_image'])) {
+        $pdf->Image(__DIR__ . '/' . $instansi['stempel_image'], $sigX + 5, $yBeforeSig - 5, 35, 0);
+    }
+    
+    $pdf->Ln(20);
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->SetX($sigX);
+    $pdf->Cell(70, 5, $namaTtd, 0, 1, 'C');
+}
+
 // Create PDF
-$orientation = ($reportType === 'overstaying' || $reportType === 'penghuni') ? 'P' : 'L';
+$orientation = ($reportType === 'overstaying' || $reportType === 'penghuni' || $reportType === 'bebas_harian') ? 'P' : 'L';
 $pdf = new MYPDF($orientation, 'mm', 'A4', true, 'UTF-8', false);
 $pdf->setInstansi($instansi);
 $pdf->reportType = $reportType;
@@ -706,7 +882,7 @@ $pdf->SetAutoPageBreak(true, 25);
 $pdf->AddPage();
 
 // Print First Page Header
-if ($reportType === 'overstaying' || $reportType === 'penghuni') {
+if ($reportType === 'overstaying' || $reportType === 'penghuni' || $reportType === 'bebas_harian') {
     // Print Logo if available
     $logoKopPath = '';
     if (!empty($instansi['logo_kop']) && file_exists(__DIR__ . '/' . $instansi['logo_kop'])) {
@@ -751,6 +927,8 @@ if ($reportType === 'overstaying' || $reportType === 'penghuni') {
     $judulLaporan = 'LAPORAN OVERSTAYING TAHANAN';
     if ($reportType === 'penghuni') {
         $judulLaporan = 'LAPORAN DATA PENGHUNI & OVERKAPASITAS';
+    } elseif ($reportType === 'bebas_harian') {
+        $judulLaporan = 'LAPORAN PENGELUARAN / BEBAS HARIAN';
     }
     
     $pdf->Cell(0, 6, $judulLaporan, 0, 1, 'C');
@@ -773,7 +951,7 @@ if ($reportType === 'overstaying' || $reportType === 'penghuni') {
     $pdf->Ln(5);
 }
 
-if ($reportType !== 'overstaying' && $reportType !== 'penghuni') {
+if ($reportType !== 'overstaying' && $reportType !== 'penghuni' && $reportType !== 'bebas_harian') {
     // Period info
     $pdf->SetFont('helvetica', '', 9);
     $periodeStr = 'Semua Periode';
@@ -811,6 +989,9 @@ switch ($reportType) {
         break;
     case 'integrasi':
         generateIntegrasiTable($pdf, $data);
+        break;
+    case 'bebas_harian':
+        generateBebasHarianTable($pdf, $data);
         break;
     case 'rekapitulasi':
         generateRekapitulasiTable($pdf, $data);

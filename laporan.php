@@ -16,7 +16,7 @@ $userUptFilter = getUserUptFilter();
 $reportType = $_GET['type'] ?? 'penghuni';
 
 // Validate report type
-$validTypes = ['penghuni', 'overstaying', 'integrasi', 'rekapitulasi'];
+$validTypes = ['penghuni', 'overstaying', 'integrasi', 'bebas_harian', 'rekapitulasi'];
 if (!in_array($reportType, $validTypes)) {
     $reportType = 'penghuni';
 }
@@ -26,6 +26,7 @@ $reportTitles = [
     'penghuni' => 'Laporan Data Penghuni',
     'overstaying' => 'Laporan Data Overstaying',
     'integrasi' => 'Laporan Data Integrasi',
+    'bebas_harian' => 'Laporan Data Bebas Harian',
     'rekapitulasi' => 'Laporan Rekapitulasi'
 ];
 
@@ -89,7 +90,7 @@ $defaultEndDate = date('Y-m-t');
         <div class="sidebar-menu">
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
             
-            <?php if (hasAccess('penghuni') || hasAccess('overstaying') || hasAccess('integrasi')): ?>
+            <?php if (hasAccess('penghuni') || hasAccess('overstaying') || hasAccess('integrasi') || hasAccess('bebas_harian')): ?>
             <div class="menu-parent collapsed" data-bs-toggle="collapse" data-bs-target="#menuInputData">
                 <i class="fas fa-edit"></i>
                 <span>Input Data</span>
@@ -105,6 +106,9 @@ $defaultEndDate = date('Y-m-t');
                     <?php endif; ?>
                     <?php if (hasAccess('integrasi')): ?>
                     <a href="integrasi.php"><i class="fas fa-exchange-alt"></i><span>Data Integrasi</span></a>
+                    <?php endif; ?>
+                    <?php if (hasAccess('bebas_harian')): ?>
+                    <a href="bebas_harian.php"><i class="fas fa-door-open"></i><span>Bebas Harian</span></a>
                     <?php endif; ?>
                     <a href="kroscek.php"><i class="fas fa-check-double"></i><span>Kroscek Data</span></a>
                 </div>
@@ -122,6 +126,7 @@ $defaultEndDate = date('Y-m-t');
                     <a href="laporan.php?type=penghuni" <?= $reportType == 'penghuni' ? 'class="active"' : '' ?>><i class="fas fa-users"></i><span>Lap. Penghuni</span></a>
                     <a href="laporan.php?type=overstaying" <?= $reportType == 'overstaying' ? 'class="active"' : '' ?>><i class="fas fa-clock"></i><span>Lap. Overstaying</span></a>
                     <a href="laporan.php?type=integrasi" <?= $reportType == 'integrasi' ? 'class="active"' : '' ?>><i class="fas fa-exchange-alt"></i><span>Lap. Integrasi</span></a>
+                    <a href="laporan.php?type=bebas_harian" <?= $reportType == 'bebas_harian' ? 'class="active"' : '' ?>><i class="fas fa-door-open"></i><span>Lap. Bebas Harian</span></a>
                     <a href="laporan.php?type=rekapitulasi" <?= $reportType == 'rekapitulasi' ? 'class="active"' : '' ?>><i class="fas fa-chart-bar"></i><span>Rekapitulasi</span></a>
                 </div>
             </div>
@@ -187,22 +192,28 @@ $defaultEndDate = date('Y-m-t');
             <!-- Report Type Selection -->
             <h6 class="mb-3">Pilih Jenis Laporan</h6>
             <div class="row mb-4">
-                <div class="col-6 col-md-3 mb-2">
+                <div class="col-6 col-md-2 mb-2">
                     <div class="report-type-card <?= $reportType == 'penghuni' ? 'active' : '' ?>" onclick="location.href='laporan.php?type=penghuni'">
                         <i class="fas fa-users"></i>
                         <h6 class="mb-0">Data Penghuni</h6>
                     </div>
                 </div>
-                <div class="col-6 col-md-3 mb-2">
+                <div class="col-6 col-md-2 mb-2">
                     <div class="report-type-card <?= $reportType == 'overstaying' ? 'active' : '' ?>" onclick="location.href='laporan.php?type=overstaying'">
                         <i class="fas fa-clock"></i>
                         <h6 class="mb-0">Overstaying</h6>
                     </div>
                 </div>
-                <div class="col-6 col-md-3 mb-2">
+                <div class="col-6 col-md-2 mb-2">
                     <div class="report-type-card <?= $reportType == 'integrasi' ? 'active' : '' ?>" onclick="location.href='laporan.php?type=integrasi'">
                         <i class="fas fa-exchange-alt"></i>
                         <h6 class="mb-0">Integrasi</h6>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 mb-2">
+                    <div class="report-type-card <?= $reportType == 'bebas_harian' ? 'active' : '' ?>" onclick="location.href='laporan.php?type=bebas_harian'">
+                        <i class="fas fa-door-open"></i>
+                        <h6 class="mb-0">Bebas Harian</h6>
                     </div>
                 </div>
                 <div class="col-6 col-md-3 mb-2">
@@ -249,7 +260,7 @@ $defaultEndDate = date('Y-m-t');
                     </div>
                 </div>
                 
-                <?php if ($reportType == 'overstaying' || $reportType == 'penghuni'): ?>
+                <?php if ($reportType == 'overstaying' || $reportType == 'penghuni' || $reportType == 'bebas_harian'): ?>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">Tempat TTD</label>
@@ -272,7 +283,7 @@ $defaultEndDate = date('Y-m-t');
                     <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
                         <i class="fas fa-redo me-1"></i> Reset
                     </button>
-                    <?php if ($reportType == 'overstaying' || $reportType == 'penghuni'): ?>
+                    <?php if ($reportType == 'overstaying' || $reportType == 'penghuni' || $reportType == 'bebas_harian'): ?>
                     <button type="button" class="btn btn-danger" onclick="submitPdf()">
                         <i class="fas fa-file-pdf me-1"></i> Cetak PDF
                     </button>

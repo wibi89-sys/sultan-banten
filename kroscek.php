@@ -99,6 +99,9 @@ $kroscekData = $stmt->fetchAll();
                     <?php if (hasAccess('integrasi')): ?>
                     <a href="integrasi.php"><i class="fas fa-exchange-alt"></i><span>Data Integrasi</span></a>
                     <?php endif; ?>
+                    <?php if (hasAccess('bebas_harian')): ?>
+                    <a href="bebas_harian.php"><i class="fas fa-door-open"></i><span>Bebas Harian</span></a>
+                    <?php endif; ?>
                     <a href="kroscek.php" class="active"><i class="fas fa-check-double"></i><span>Kroscek Data</span></a>
                 </div>
             </div>
@@ -115,6 +118,7 @@ $kroscekData = $stmt->fetchAll();
                     <a href="laporan.php?type=penghuni"><i class="fas fa-users"></i><span>Lap. Penghuni</span></a>
                     <a href="laporan.php?type=overstaying"><i class="fas fa-clock"></i><span>Lap. Overstaying</span></a>
                     <a href="laporan.php?type=integrasi"><i class="fas fa-exchange-alt"></i><span>Lap. Integrasi</span></a>
+                    <a href="laporan.php?type=bebas_harian"><i class="fas fa-door-open"></i><span>Lap. Bebas Harian</span></a>
                     <a href="laporan.php?type=rekapitulasi"><i class="fas fa-chart-bar"></i><span>Rekapitulasi</span></a>
                 </div>
             </div>

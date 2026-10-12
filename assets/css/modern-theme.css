@@ -396,6 +396,12 @@ body {
     flex-direction: column;
 }
 
+.content-wrapper {
+    padding: 20px 24px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
 /* ============================================
    TOPBAR - Modern Header
    ============================================ */
