@@ -564,12 +564,6 @@ function generateOverstayingTable($pdf, $data) {
     $pdf->Cell(0, 5, 'Sumber: Data berikut diperoleh dari SDP.', 0, 1, 'L');
     $pdf->Ln(1); // Reduced from 2
     $pdf->Cell(0, 5, 'Demikian laporan ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
-    
-    // Footer & Signature
-    $pdf->Ln(2);
-    $pdf->SetFont('helvetica', '', 9);
-    $pdf->Ln(1);
-    $pdf->Cell(0, 5, 'Demikian laporan ini disampaikan, atas perhatiannya diucapkan terima kasih.', 0, 1, 'L');
     $pdf->Ln(5);
     renderPdfSignatureBlock($pdf, 130);
 }
