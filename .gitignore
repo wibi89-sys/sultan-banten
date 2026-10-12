@@ -5,3 +5,4 @@ Thumbs.db
 config/database.php
 uploads/
 upload/
+laravel/
