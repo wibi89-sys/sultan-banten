@@ -47,6 +47,62 @@ $klasifikasiKeys = [
     'Seumur Hidup' => 'seumur_hidup'
 ];
 
+// Handle AJAX get previous data
+if (isset($_GET['action']) && $_GET['action'] === 'get_previous_data') {
+    header('Content-Type: application/json');
+    $uptId = (int)($_GET['upt_id'] ?? 0);
+    $tanggal = sanitize($_GET['tanggal'] ?? date('Y-m-d'));
+
+    if (!$uptId) {
+        echo json_encode(['success' => false, 'has_data' => false, 'message' => 'Pilih UPT terlebih dahulu.']);
+        exit;
+    }
+
+    // Input data tidak ada hari libur: ambil tepat data hari kemarin (H-1)
+    $previousDate = date('Y-m-d', strtotime($tanggal . ' - 1 day'));
+
+    $stmtData = $pdo->prepare("SELECT * FROM data_penghuni WHERE upt_id = ? AND tanggal = ?");
+    $stmtData->execute([$uptId, $previousDate]);
+    $records = $stmtData->fetchAll();
+
+    if (empty($records)) {
+        echo json_encode([
+            'success' => true,
+            'has_data' => false,
+            'previous_date' => $previousDate,
+            'formatted_yesterday' => formatIndonesianDate($previousDate),
+            'message' => 'Data hari kemarin (' . formatIndonesianDate($previousDate) . ') belum diinput untuk UPT ini. Silakan input data hari kemarin terlebih dahulu atau input manual dari 0.'
+        ]);
+        exit;
+    }
+
+    $data = [];
+    foreach ($records as $r) {
+        $key = $klasifikasiKeys[$r['klasifikasi_pidana']] ?? null;
+        if ($key) {
+            $data[$key] = [
+                'tahanan_dl' => (int)$r['tahanan_dewasa_laki'],
+                'tahanan_dp' => (int)$r['tahanan_dewasa_perempuan'],
+                'tahanan_al' => (int)$r['tahanan_anak_laki'],
+                'tahanan_ap' => (int)$r['tahanan_anak_perempuan'],
+                'narapidana_dl' => (int)$r['narapidana_dewasa_laki'],
+                'narapidana_dp' => (int)$r['narapidana_dewasa_perempuan'],
+                'narapidana_al' => (int)$r['narapidana_anak_laki'],
+                'narapidana_ap' => (int)$r['narapidana_anak_perempuan'],
+            ];
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'has_data' => count($data) > 0,
+        'previous_date' => $previousDate,
+        'formatted_date' => formatIndonesianDate($previousDate),
+        'data' => $data
+    ]);
+    exit;
+}
+
 // Handle Save All Data
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf_token = $_POST['csrf_token'] ?? '';
@@ -823,6 +879,22 @@ $dataPenghuni = $stmt->fetchAll();
                             </div>
                         </div>
                         
+                        <!-- Banner Informasi Auto-Copy Data Kemarin -->
+                        <div id="previousDataNotice" class="alert alert-info py-2 px-3 mb-2 small d-none d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div>
+                                <i class="fas fa-magic text-primary me-2"></i>
+                                <span id="previousDataText">Memeriksa data hari kemarin...</span>
+                            </div>
+                            <div class="d-flex gap-1 ms-auto">
+                                <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" id="btnResetZero" title="Kosongkan semua input ke 0">
+                                    <i class="fas fa-eraser me-1"></i>Reset ke 0
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" id="btnReloadPrevious" title="Muat ulang data hari kemarin">
+                                    <i class="fas fa-sync-alt me-1"></i>Muat Ulang
+                                </button>
+                            </div>
+                        </div>
+                        
                         <div class="input-container" style="overflow: auto; border: 1px solid var(--border-color); border-radius: 8px;">
                             <table class="input-table mb-0">
                                 <thead class="sticky-top">
@@ -1151,6 +1223,111 @@ $dataPenghuni = $stmt->fetchAll();
             document.getElementById('edit_keterangan').value = data.keterangan || '';
             
             new bootstrap.Modal(document.getElementById('modalEdit')).show();
+        }
+
+        // Auto-Fetch & Pre-Fill Data Hari Kemarin
+        const modalAddEl = document.getElementById('modalAdd');
+        const selectUpt = modalAddEl ? modalAddEl.querySelector('select[name="upt_id"]') : null;
+        const inputTanggal = modalAddEl ? modalAddEl.querySelector('input[name="tanggal"]') : null;
+        const noticeBox = document.getElementById('previousDataNotice');
+        const noticeText = document.getElementById('previousDataText');
+        const btnResetZero = document.getElementById('btnResetZero');
+        const btnReloadPrevious = document.getElementById('btnReloadPrevious');
+
+        function loadPreviousData() {
+            if (!selectUpt || !inputTanggal) return;
+            const uptId = selectUpt.value;
+            const tanggal = inputTanggal.value;
+            if (!uptId || !tanggal) {
+                if (noticeBox) noticeBox.classList.add('d-none');
+                return;
+            }
+
+            if (noticeBox) {
+                noticeBox.classList.remove('d-none', 'alert-warning', 'alert-success');
+                noticeBox.classList.add('alert-info');
+                noticeText.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Memeriksa data hari kemarin untuk UPT ini...';
+            }
+
+            fetch(`penghuni.php?action=get_previous_data&upt_id=${uptId}&tanggal=${tanggal}`)
+                .then(res => res.json())
+                .then(res => {
+                    if (res.success && res.has_data && res.data) {
+                        // Populate inputs
+                        Object.keys(res.data).forEach(key => {
+                            const row = res.data[key];
+                            ['tahanan_dl', 'tahanan_dp', 'tahanan_al', 'tahanan_ap', 'narapidana_dl', 'narapidana_dp', 'narapidana_al', 'narapidana_ap'].forEach(col => {
+                                const input = modalAddEl.querySelector(`input[name="${col}_${key}"]`);
+                                if (input) {
+                                    input.value = row[col] ?? 0;
+                                }
+                            });
+                            updateRowTotal(key);
+                        });
+                        updateGrandTotals();
+
+                        if (noticeBox) {
+                            noticeBox.classList.remove('d-none', 'alert-info', 'alert-warning');
+                            noticeBox.classList.add('alert-success');
+                            noticeText.innerHTML = `<i class="fas fa-check-circle text-success me-1"></i> Data berhasil <strong>disalin otomatis dari hari kemarin (${res.formatted_date})</strong>. Silakan sesuaikan angka yang berubah saja.`;
+                        }
+                    } else {
+                        // Jika data hari kemarin belum diinput, kosongkan input ke 0
+                        const inputs = modalAddEl.querySelectorAll('.input-table input[type="number"]');
+                        inputs.forEach(input => { input.value = 0; });
+                        klasifikasiUtama.concat(klasifikasiLainnya).forEach(key => { updateRowTotal(key); });
+                        updateGrandTotals();
+
+                        if (noticeBox) {
+                            noticeBox.classList.remove('d-none', 'alert-info', 'alert-success');
+                            noticeBox.classList.add('alert-warning');
+                            noticeText.innerHTML = `<i class="fas fa-exclamation-triangle text-warning me-1"></i> ${res.message || 'Data hari kemarin belum diinput untuk UPT ini. Silakan input dari 0.'}`;
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading previous data:', err);
+                    if (noticeBox) noticeBox.classList.add('d-none');
+                });
+        }
+
+        function resetFormToZero() {
+            if (!modalAddEl) return;
+            const inputs = modalAddEl.querySelectorAll('.input-table input[type="number"]');
+            inputs.forEach(input => {
+                input.value = 0;
+            });
+            klasifikasiUtama.concat(klasifikasiLainnya).forEach(key => {
+                updateRowTotal(key);
+            });
+            updateGrandTotals();
+
+            if (noticeBox) {
+                noticeBox.classList.remove('d-none', 'alert-info', 'alert-success');
+                noticeBox.classList.add('alert-warning');
+                noticeText.innerHTML = '<i class="fas fa-eraser me-1"></i> Semua input telah di-reset ke nilai 0.';
+            }
+        }
+
+        if (selectUpt) {
+            selectUpt.addEventListener('change', loadPreviousData);
+        }
+        if (inputTanggal) {
+            inputTanggal.addEventListener('change', loadPreviousData);
+        }
+        if (btnResetZero) {
+            btnResetZero.addEventListener('click', resetFormToZero);
+        }
+        if (btnReloadPrevious) {
+            btnReloadPrevious.addEventListener('click', loadPreviousData);
+        }
+
+        if (modalAddEl) {
+            modalAddEl.addEventListener('show.bs.modal', function() {
+                if (selectUpt && selectUpt.value) {
+                    loadPreviousData();
+                }
+            });
         }
     </script>
     <?php include 'includes/marquee.php'; ?>
